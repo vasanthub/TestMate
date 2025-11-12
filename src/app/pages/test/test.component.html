@@ -1,0 +1,267 @@
+      
+            
+<div class="test-container" *ngIf="!loading && testStarted">
+  <div *ngIf="!showResult" class="test-layout">
+    <!-- Main Question Area -->
+    <div class="question-area">
+      <div class="question-header">
+        <div class="question-number">
+          Question {{ currentIndex + 1 }} of {{ questions.length }}
+        </div>
+        <div class="header-actions">
+          <span class="clipboard-label">{{ClipboardCopyStatus}}</span>
+          
+          <button class="btn-icon" (click)="copyQuestionToClipboard()" title="Copy question">
+            📑           
+          </button>
+          <button class="btn-icon" (click)="toggleTimer()" title="Toggle timer">
+            ⏱️
+          </button>
+          <button class="btn btn-success" (click)="finishTest()">
+          Finish Test
+        </button>  
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="(currentIndex + 1) / questions.length * 100"></div>
+        </div>        
+      </div>
+
+      <div class="question-content">
+        <div class="question-text" [innerHTML]="renderLatex(currentQuestion.question)"></div>
+        
+        <div *ngIf="currentQuestion.question_image" class="question-image">
+          <img [src]="currentQuestion.question_image" alt="Question image">
+        </div>
+
+        <!-- Multiple Choice Options -->
+        <div *ngIf="isMultipleChoice" class="options">
+          <div *ngFor="let option of currentQuestion.options; let i = index" 
+               class="option"
+               [class.selected]="selectedOptions[i]"
+               [class.correct-answer]="showFeedback && isCorrectOption(i)"
+               [class.wrong-answer]="showFeedback && selectedOptions[i] && !isCorrectOption(i)">
+            
+            <label *ngIf="isSingleAnswer" class="option-label">
+              <input 
+                type="radio" 
+                [name]="'question-' + currentIndex"
+                [checked]="selectedOptions[i]"
+                [disabled]="isAnswerSubmitted"
+                (change)="onOptionChange(i)">
+              <span class="option-content">
+                <span class="option-text" [innerHTML]="renderLatex(option)"></span>
+                <img *ngIf="currentQuestion.options_image && currentQuestion.options_image[i]" 
+                     [src]="currentQuestion.options_image[i]" 
+                     class="option-image" 
+                     alt="Option image">
+              </span>
+            </label>
+
+            <label *ngIf="isMultipleAnswer" class="option-label">
+              <input 
+                type="checkbox" 
+                [disabled]="isAnswerSubmitted"
+                [(ngModel)]="selectedOptions[i]">
+              <span class="option-content">
+                <span class="option-text" [innerHTML]="renderLatex(option)"></span>
+                <img *ngIf="currentQuestion.options_image && currentQuestion.options_image[i]" 
+                     [src]="currentQuestion.options_image[i]" 
+                     class="option-image" 
+                     alt="Option image">
+              </span>
+            </label>
+            
+            
+        </div>
+
+      </div>
+
+        <!-- Text Answer -->
+        <div *ngIf="isTextAnswer" class="text-answer">
+          <textarea *ngIf="!isTextAnswer"
+            #answerInput
+            [(ngModel)]="textAnswer"
+            [disabled]="isAnswerSubmitted"
+            placeholder="Enter your answer here..."
+            rows="4"></textarea>
+          <p *ngIf="currentQuestion.answerRegex && !isTextAnswer" class="hint">
+            <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Answer will be validated using pattern matching
+          </p>
+          
+          <!-- Text Answer Action Buttons - Always visible before submission -->
+          <div *ngIf="!isAnswerSubmitted" class="text-answer-actions">
+            <button class="btn btn-warning btn-sm" (click)="revealAnswer()" *ngIf="!showFeedback">
+              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2"/>
+                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-width="2"/>
+              </svg>
+              Reveal Answer
+            </button>            
+          </div>
+
+          <div *ngIf="showFeedback" class="correct-text-answer">
+            <strong>Correct Answer:</strong> <span [innerHTML]="renderLatex(currentQuestion.answerText || '')"></span>
+          </div>
+
+          <!-- Manual marking buttons after reveal -->
+          <div *ngIf="showFeedback && !isAnswerSubmitted" class="text-answer-actions">
+            <button class="btn btn-success btn-sm" (click)="markAsCorrect()">
+              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Mark as Correct
+            </button>
+            <button class="btn btn-error btn-sm" (click)="markAsIncorrect()">
+              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Mark as Incorrect
+            </button>
+          </div>
+
+          <div *ngIf="showFeedback && currentQuestion.explanation" class="correct-text-answer">
+            <strong>Explanation:</strong> <span [innerHTML]="renderLatex(currentQuestion.explanation)"></span>
+          </div>
+
+        </div>
+      <!-- Answer Feedback -->
+      <div *ngIf="showFeedback && isCurrentAnswerCorrect" class="answer-feedback-text">
+        ✓ Correct!
+      </div>
+
+      <div class="question-actions">
+        <button *ngIf="!isAnswerSubmitted && !isTextAnswer" class="btn btn-primary btn-submit" (click)="submitAnswer()">
+          Submit Answer          
+        </button>
+        <button *ngIf="isAnswerSubmitted && !isCurrentAnswerCorrect" class="btn btn-primary btn-got-it" (click)="nextQuestion()">
+          Got It →          
+        </button>
+        <button class="btn btn-secondary" (click)="previousQuestion()" [disabled]="currentIndex === 0">
+          ← Previous
+        </button>
+        <button class="btn btn-secondary" (click)="nextQuestion()" [disabled]="currentIndex === questions.length - 1">
+          Next →
+        </button>
+
+      </div>
+       <div *ngIf="showFeedback && currentQuestion.explanation" class="correct-text-answer">
+            <strong>Explanation:</strong> <span [innerHTML]="renderLatex(currentQuestion.explanation)"></span>
+          </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="info-panel">
+      <div class="timer-card card" *ngIf="showTimer">
+        <svg class="timer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="timer-text">{{ elapsedTime }}</div>
+      </div>
+
+      <!-- <div class="stats-card card">
+        <div class="stat-item">
+          <span class="stat-label">Total Questions:</span>
+          <span class="stat-value">{{ questions.length }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Answered:</span>
+          <span class="stat-value">{{ answeredCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Remaining:</span>
+          <span class="stat-value">{{ questions.length - answeredCount }}</span>
+        </div>
+      </div> -->
+
+      <div class="questions-grid card">
+        <div class="grid-header">Questions</div>
+        <div class="grid-items">
+          <button 
+            *ngFor="let q of questions; let i = index"
+            class="question-box"
+            [class.current]="i === currentIndex"
+            [class.correct]="getQuestionStatus(i) === 'correct'"
+            [class.incorrect]="getQuestionStatus(i) === 'incorrect'"
+            [class.unanswered]="getQuestionStatus(i) === 'unanswered'"
+            (click)="goToQuestion(i)">
+            {{ i + 1 }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>  
+</div>
+
+<!-- Result Screen -->
+  <div *ngIf="showResult" class="result-screen">
+    <div class="result-card card">
+      <div class="result-icon">
+        <svg *ngIf="finalScore >= 70" class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg *ngIf="finalScore < 70" class="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <h1 class="result-title">{{ isPractice ? 'Practice' : 'Test' }} Complete!</h1>
+      
+      <div class="score-display">
+        <div class="score-circle">
+          <span class="score-number">{{ finalScore }}%</span>
+        </div>
+      </div>
+
+      <div class="result-stats">
+        <div class="result-stat">
+          <span class="result-stat-value">{{ answeredCount }}</span>
+          <span class="result-stat-label">Answered</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">{{ correctCount }}</span>
+          <span class="result-stat-label">Correct</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">{{ incorrectCount }}</span>
+          <span class="result-stat-label">Incorrect</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">{{ skippedCount }}</span>
+          <span class="result-stat-label">Skipped</span>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-primary" (click)="retakeFull()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Retake Full Test
+        </button>
+        <button *ngIf="incorrectCount > 0" 
+                class="btn btn-warning" 
+                (click)="retakeIncorrect()">
+          Retry Incorrect
+        </button>
+        <button *ngIf="skippedCount > 0" 
+                class="btn btn-secondary" 
+                (click)="retakeSkipped()">
+          Retry Skipped
+        </button>
+        <button *ngIf="!isPractice" class="btn btn-secondary" (click)="viewResults()">
+          View All Results
+        </button>
+        <button class="btn btn-secondary" (click)="goHome()">
+          Back to Home
+        </button>
+      </div>
+    </div>
+  </div>
+
+<div *ngIf="loading" class="loading">
+  <div class="spinner"></div>
+  <p>Loading test...</p>
+</div>

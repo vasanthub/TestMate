@@ -1,0 +1,27 @@
+<header class="header">
+  <div class="header-content">
+    
+    <!-- Left: Home -->
+    <nav class="nav left-nav">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-link">Home</a>
+    </nav>
+
+    <!-- Center: Hero -->
+    <div class="hero">
+      <h1 class="hero-title">TestMate</h1>
+      <p class="hero-subtitle">Your intelligent MCQ practice and test companion</p>
+    </div>
+
+    <!-- Right: Profile -->
+    <nav class="nav right-nav">
+      <div class="profile">
+        <svg class="profile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ profileName }}</span>
+      </div>
+    </nav>
+
+  </div>
+</header>

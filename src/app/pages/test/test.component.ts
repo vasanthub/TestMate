@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -16,7 +16,8 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 })
 export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('answerInput') answerInput?: ElementRef;
-  
+   @ViewChild('timerText', { static: false }) timerText!: ElementRef<HTMLDivElement>;
+   
   domain: string = '';
   topic: string = '';
   repository: string = '';
@@ -53,7 +54,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     private router: Router,
     private dataService: DataService,
     private latexService: LatexService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit(): void {
@@ -80,7 +82,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     this.startTimer();
     
     // Add keyboard listener for Ctrl+Enter
-    document.addEventListener('keydown', this.handleKeyPress);
+    document.addEventListener('keyup', this.handleKeyPress);
   }
 
   ngAfterViewInit(): void {
@@ -91,7 +93,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
-    document.removeEventListener('keydown', this.handleKeyPress);
+    document.removeEventListener('keyup', this.handleKeyPress);
   }
 
   handleKeyPress = (event: KeyboardEvent): void => {
@@ -188,15 +190,23 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  startTimer(): void {
+startTimer(): void {
+  this.ngZone.runOutsideAngular(() => {
     this.timerInterval = setInterval(() => {
       const now = new Date();
       const diff = now.getTime() - this.startTime.getTime();
       const minutes = Math.floor(diff / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
-      this.elapsedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+      const newElapsed = `${minutes.toString().padStart(2, '0')}:${seconds
+        .toString()
+        .padStart(2, '0')}`;
+
+      // ✅ update DOM directly — stay outside Angular zone
+      this.timerText.nativeElement.textContent = newElapsed;
     }, 1000);
-  }
+    });
+}
 
   initializeAnswer(): void {
     const question = this.questions[this.currentIndex];

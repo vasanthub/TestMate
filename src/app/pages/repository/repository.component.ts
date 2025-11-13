@@ -34,7 +34,8 @@ export class RepositoryComponent implements OnInit {
   
   rangeStart: number = 1;
   rangeEnd: number = 0;
-  useRange: boolean = false;
+  useRange: boolean = true;
+  clearPreviousAttempts: boolean= false;
   testName: string = '';
   
   savedTests: TestConfiguration[] = [];
@@ -231,6 +232,9 @@ export class RepositoryComponent implements OnInit {
   }
 
   startPractice(): void {
+    if (this.clearPreviousAttempts)
+      localStorage.setItem('attemptInfo'+this.repository, "");
+    
     const queryParams: any = { practice: 'true' };
     if (this.useRange) {
       queryParams.start = this.rangeStart;

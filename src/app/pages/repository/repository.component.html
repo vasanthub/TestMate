@@ -44,6 +44,11 @@
           <input type="checkbox" [(ngModel)]="useRange">
           <span>Select question range</span>
         </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="clearPreviousAttempts">
+          <span>Clear Previous Attempts</span>
+        </label>
         
         <div *ngIf="useRange" class="range-inputs">
           <div class="input-group">

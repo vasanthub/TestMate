@@ -147,25 +147,35 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   loadQuestions(start?: number | null, end?: number | null): void {
     this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
       next: (questions) => {
-        console.log(questions);
-        const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];
-        const retestQuestionsJson = sessionStorage.getItem('retestQuestions');
+        const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];        
+        const attemptInfoJson = localStorage.getItem('attemptInfo'+this.repository);
         
-        if (filterQuestions === 'true' && retestQuestionsJson) {
-          const indices: number[] = JSON.parse(retestQuestionsJson);
-          this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);
-          sessionStorage.removeItem('retestQuestions');
-        } else if (start && end) {
+        if (filterQuestions === 'true' && attemptInfoJson) {
+          const indices: number[] = JSON.parse(attemptInfoJson);
+          this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);          
+        } 
+        else if (start && end) {
           this.questions = questions.slice(start - 1, end);
-        } else {
+        }
+        else {
           this.questions = questions;
         }
         
-        this.attempts = this.questions.map((_, index) => ({
-          question_index: index,
-          correct: false,
-          skipped: true
-        }));
+        if (attemptInfoJson)
+        {
+          this.attempts=JSON.parse(attemptInfoJson);
+          console.log("this.attempts2");
+          console.log(this.attempts);
+        }
+        else
+        {
+          console.log("this.attempts3");
+           this.attempts = this.questions.map((_, index) => ({
+              question_index: index,
+              correct: false,
+              skipped: true
+            }));
+        }
         
         this.loading = false;
         this.testStarted = true;
@@ -395,6 +405,16 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   finishTest(): void {
     this.finalScore = this.dataService.calculateScore(this.questions, this.attempts);
     
+    const incorrectIndices = this.attempts
+      .map((a, i) => !a.correct && !a.skipped ? i : -1)
+      .filter(i => i !== -1);
+    
+    console.log(incorrectIndices);
+
+    //if (incorrectIndices.length > 0)     
+    localStorage.setItem('attemptInfo'+this.repository, JSON.stringify(this.attempts));
+    
+
     if (!this.isPractice) {
       this.saveTestResult();
     }
@@ -519,8 +539,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     console.log(incorrectIndices);
 
     if (incorrectIndices.length > 0) {
-      localStorage.setItem('retestQuestions', JSON.stringify(incorrectIndices));
-      
+     
       this.dataService.getTestResults(this.dataService.getProfileName()).subscribe({
         next: (tests) => {
           const currentTest = tests[0];
@@ -543,8 +562,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       .map((a, i) => a.skipped ? i : -1)
       .filter(i => i !== -1);
     
-    if (skippedIndices.length > 0) {
-      sessionStorage.setItem('retestQuestions', JSON.stringify(skippedIndices));
+    if (skippedIndices.length > 0) {      
       
       this.dataService.getTestResults(this.dataService.getProfileName()).subscribe({
         next: (tests) => {

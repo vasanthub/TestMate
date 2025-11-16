@@ -44,6 +44,12 @@ private profileName$ = new BehaviorSubject<string>('default');
     return this.http.get<Question[]>(`${this.apiUrl}/repository/${domain}/${topic}/${repository}`);
   }
 
+  generateMCQs(topic: string): Observable<Question[]> {
+    return this.http.post<Question[]>(`${this.apiUrl}/reading/generate-mcqs`, {
+      topic: topic
+    });
+  }
+
   saveTestResult(test: TestInstance): Observable<any> {
     return this.http.post(`${this.apiUrl}/test-results`, test);
   }

@@ -1,36 +1,96 @@
 <div class="container">
 
-
   <div *ngIf="loading" class="loading">
     <div class="spinner"></div>
     <p>Loading repositories...</p>
   </div>
 
-  <div *ngIf="!loading" class="domains">
-    <div *ngFor="let domain of domains" class="domain-card">
-      <div class="domain-header">
-        <svg class="domain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <h2 class="domain-title">{{ domain }}</h2>
-      </div>
-      
-      <div class="topics">
-        <div *ngFor="let topic of getTopics(domain)" class="topic-card">
-          <h3 class="topic-title">{{ topic }}</h3>
-          <div class="repositories">
-            <a 
-              *ngFor="let repo of getRepositories(domain, topic)" 
-              [routerLink]="['/repository', domain, topic, repo]"
-              class="repo-link">
-              <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>{{ repo }}</span>
-            </a>
+  <div class="tabs">
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'predefined'"
+      (click)="switchTab('predefined')">
+      Predefined Tests
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'ai'"
+      (click)="switchTab('ai')">
+      AI-Powered Test
+    </button>
+  </div>
+
+  <div class="tab-content">
+    <div *ngIf="!loading && activeTab === 'predefined'" class="domains">
+        <div *ngFor="let domain of domains" class="domain-card">
+          <div class="domain-header">
+            <svg class="domain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h2 class="domain-title">{{ domain }}</h2>
+          </div>
+          
+          <div class="topics">
+            <div *ngFor="let topic of getTopics(domain)" class="topic-card">
+              <h3 class="topic-title">{{ topic }}</h3>
+              <div class="repositories">
+                <a 
+                  *ngFor="let repo of getRepositories(domain, topic)" 
+                  [routerLink]="['/repository', domain, topic, repo]"
+                  class="repo-link">
+                  <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>{{ repo }}</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+    </div>
+
+    <div *ngIf="activeTab === 'ai'" class="ai-tab">
+        <h2>AI-Powered Dynamic Test</h2>
+        
+        <div class="ai-content">
+          <p class="ai-description">
+            Enter a topic or area to generate MCQs dynamically using AI. 
+            You can specify the number of questions and difficulty level in your prompt.
+          </p>
+          
+          <div class="ai-input-section">
+            <label for="aiTopic">Enter your topic:</label>
+            <textarea 
+              id="aiTopic"
+              [(ngModel)]="aiTopic"
+              placeholder="Examples:&#10;- Give me 20 MCQs on AI Fundamentals&#10;- 15 easy questions about Photosynthesis&#10;- Chemistry MCQs on Acids and Bases"
+              rows="4"
+              [disabled]="isLoadingAI"></textarea>
+            
+            <div class="ai-buttons">
+              <button 
+                class="start-test-button"
+                (click)="startAITest()"
+                [disabled]="!aiTopic.trim() || isLoadingAI">
+                <span *ngIf="!isLoadingAI">Generate & Start Test</span>
+                <span *ngIf="isLoadingAI">
+                  <span class="spinner"></span> Generating Questions...
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ai-info">
+            <h3>Tips:</h3>
+            <ul>
+              <li>Default is 10 MCQs if you don't specify a number</li>
+              <li>You can request specific difficulty levels (easy, medium, hard)</li>
+              <li>Questions support LaTeX for mathematical and chemical formulas</li>
+              <li>Generated tests are temporary and not saved (copy feature coming soon)</li>
+            </ul>
+          </div>
+        </div>
     </div>
   </div>
+
 </div>

@@ -49,6 +49,12 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   parentTestId?: string;
   retestType?: string;
 
+  isAIGenerated: boolean = false;
+  aiGeneratedQuestions: Question[] = [];
+  testName: string = '';
+  mode: 'practice' | 'test' = 'practice';
+  userAnswers: (number[] | string)[] = [];
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -56,7 +62,26 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     private latexService: LatexService,
     private sanitizer: DomSanitizer,
     private ngZone: NgZone
-  ) {}
+  ) {
+    const navigation = this.router.getCurrentNavigation();
+    const state = navigation?.extras?.state as any;
+
+    if (state?.testData) {
+      this.questions = state.testData.questions;
+      this.testName = state.testData.testName;
+      this.domain = state.testData.domain;
+      this.topic = state.testData.topic;
+      this.repository = state.testData.repository;
+      this.mode = state.testData.mode || 'practice';
+      this.isAIGenerated = state.testData.isAIGenerated || false;
+      
+      if (this.isAIGenerated) {
+        this.aiGeneratedQuestions = [...this.questions];
+      }
+      
+      this.initializeAnswers();
+    }
+  }
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
@@ -76,13 +101,38 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       const end = params['end'] ? parseInt(params['end']) : null;
       this.parentTestId = params['parentTestId'];
       this.retestType = params['retestType'];
-      this.loadQuestions(start, end);
+      
+      if (this.isAIGenerated)
+      {
+          this.loadAIQuestions();
+          this.initializeAnswer();
+      }
+      else{
+        this.loadQuestions(start, end);
+      }
+        
     });
 
     this.startTimer();
     
     // Add keyboard listener for Ctrl+Enter
     document.addEventListener('keyup', this.handleKeyPress);
+  }
+
+  loadAIQuestions(){   
+      this.attempts = this.questions.map((_, index) => ({
+        question_index: index,
+        correct: false,
+        skipped: true
+      }));
+
+      this.loading = false;
+      this.testStarted = true;
+    }
+
+
+  initializeAnswers(): void {
+    this.userAnswers = new Array(this.questions.length).fill(null);
   }
 
   ngAfterViewInit(): void {
@@ -146,6 +196,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  
   loadQuestions(start?: number | null, end?: number | null): void {
     this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
       next: (questions) => {
@@ -597,5 +648,20 @@ startTimer(): void {
 
   viewResults(): void {
     this.router.navigate(['/results']);
+  }
+
+   copyQuestionsToClipboard(): void {
+    if (!this.isAIGenerated || this.aiGeneratedQuestions.length === 0) {
+      return;
+    }
+
+    const jsonString = JSON.stringify(this.aiGeneratedQuestions, null, 2);
+    
+    navigator.clipboard.writeText(jsonString).then(() => {
+      alert('Questions copied to clipboard in JSON format!');
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy to clipboard');
+    });
   }
 }

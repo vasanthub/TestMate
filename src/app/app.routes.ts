@@ -14,6 +14,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/test/test.component').then(m => m.TestComponent)
   },
   {
+    path: 'ai-test',
+    loadComponent: () => import('./pages/test/test.component').then(m => m.TestComponent)
+  },
+  {
     path: 'practice/:domain/:topic/:repository',
     loadComponent: () => import('./pages/test/test.component').then(m => m.TestComponent)
   },

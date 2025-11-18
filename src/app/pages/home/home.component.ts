@@ -28,11 +28,16 @@ export class HomeComponent implements OnInit {
   filteredTopics: { [domain: string]: string[] } = {};
   filteredRepos: { [key: string]: string[] } = {};
 
+  repositoryStatuses: { [key: string]: string } = {};
+  statusFilter: string = 'all';
+  openStatusMenu: string | null = null;
+
   constructor(private route: ActivatedRoute,
     private router: Router, private dataService: DataService) {}
 
   ngOnInit(): void {
     this.loadStructure();
+    this.loadRepositoryStatuses();
   }
 
   loadStructure(): void {
@@ -48,6 +53,54 @@ export class HomeComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  loadRepositoryStatuses(): void {
+    this.dataService.getRepositoryStatuses().subscribe({
+      next: (statuses) => {
+        this.repositoryStatuses = statuses;
+      },
+      error: (err) => {
+        console.error('Error loading repository statuses:', err);
+      }
+    });
+  }
+
+  getRepositoryStatus(domain: string, topic: string, repository: string): string {
+    const key = `${domain}|${topic}|${repository}`;
+    return this.repositoryStatuses[key] || 'not_started';
+  }
+
+  updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    this.dataService.updateRepositoryStatus(domain, topic, repository, status).subscribe({
+      next: () => {
+        const key = `${domain}|${topic}|${repository}`;
+        this.repositoryStatuses[key] = status;
+        this.openStatusMenu = null;
+      },
+      error: (err) => {
+        console.error('Error updating repository status:', err);
+      }
+    });
+  }
+
+  toggleStatusMenu(domain: string, topic: string, repository: string, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const key = `${domain}|${topic}|${repository}`;
+    if (this.openStatusMenu === key) {
+      this.openStatusMenu = null;
+    } else {
+      this.openStatusMenu = key;
+    }
+  }
+
+  isStatusMenuOpen(domain: string, topic: string, repository: string): boolean {
+    return this.openStatusMenu === `${domain}|${topic}|${repository}`;
   }
 
   switchTab(tab: 'predefined' | 'ai'): void {
@@ -91,9 +144,7 @@ export class HomeComponent implements OnInit {
     const query = this.searchQuery.toLowerCase().trim();
     
     if (!query) {
-      this.filteredDomains = [...this.domains];
-      this.filteredTopics = {};
-      this.filteredRepos = {};
+      this.applyFilters();
       return;
     }
 
@@ -131,6 +182,8 @@ export class HomeComponent implements OnInit {
         this.filteredTopics[domain] = matchingTopics;
       }
     });
+
+    this.applyStatusFilter();
   }
 
   clearSearch(): void {
@@ -138,12 +191,102 @@ export class HomeComponent implements OnInit {
     this.onSearch();
   }
 
+  onStatusFilterChange(): void {
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    const query = this.searchQuery.toLowerCase().trim();
+    
+    this.filteredDomains = [];
+    this.filteredTopics = {};
+    this.filteredRepos = {};
+
+    this.domains.forEach(domain => {
+      const topics = this.getTopics(domain);
+      const matchingTopics: string[] = [];
+      let domainMatches = !query || domain.toLowerCase().includes(query);
+
+      topics.forEach(topic => {
+        const repos = this.getRepositories(domain, topic);
+        let matchingRepos = repos;
+
+        if (query) {
+          matchingRepos = repos.filter(repo => 
+            repo.toLowerCase().includes(query)
+          );
+        }
+
+        if (this.statusFilter !== 'all') {
+          matchingRepos = matchingRepos.filter(repo => 
+            this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
+          );
+        }
+
+        const topicMatches = !query || topic.toLowerCase().includes(query);
+
+        if ((topicMatches || matchingRepos.length > 0 || domainMatches) && 
+            (this.statusFilter === 'all' || matchingRepos.length > 0)) {
+          matchingTopics.push(topic);
+          const key = `${domain}-${topic}`;
+          this.filteredRepos[key] = matchingRepos;
+          
+          if (query || this.statusFilter !== 'all') {
+            this.expandedDomains[domain] = true;
+            this.expandedTopics[key] = true;
+          }
+        }
+      });
+
+      if ((domainMatches || matchingTopics.length > 0) && 
+          (this.statusFilter === 'all' || matchingTopics.length > 0)) {
+        this.filteredDomains.push(domain);
+        this.filteredTopics[domain] = matchingTopics;
+      }
+    });
+  }
+
+  applyStatusFilter(): void {
+    if (this.statusFilter === 'all') return;
+
+    const newFilteredDomains: string[] = [];
+    const newFilteredTopics: { [domain: string]: string[] } = {};
+    const newFilteredRepos: { [key: string]: string[] } = {};
+
+    this.filteredDomains.forEach(domain => {
+      const topics = this.filteredTopics[domain] || this.getTopics(domain);
+      const matchingTopics: string[] = [];
+
+      topics.forEach(topic => {
+        const key = `${domain}-${topic}`;
+        const repos = this.filteredRepos[key] || this.getRepositories(domain, topic);
+        const matchingRepos = repos.filter(repo => 
+          this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
+        );
+
+        if (matchingRepos.length > 0) {
+          matchingTopics.push(topic);
+          newFilteredRepos[key] = matchingRepos;
+        }
+      });
+
+      if (matchingTopics.length > 0) {
+        newFilteredDomains.push(domain);
+        newFilteredTopics[domain] = matchingTopics;
+      }
+    });
+
+    this.filteredDomains = newFilteredDomains;
+    this.filteredTopics = newFilteredTopics;
+    this.filteredRepos = newFilteredRepos;
+  }
+
   getFilteredDomains(): string[] {
-    return this.searchQuery ? this.filteredDomains : this.domains;
+    return this.searchQuery || this.statusFilter !== 'all' ? this.filteredDomains : this.domains;
   }
 
   getFilteredTopics(domain: string): string[] {
-    if (this.searchQuery && this.filteredTopics[domain]) {
+    if ((this.searchQuery || this.statusFilter !== 'all') && this.filteredTopics[domain]) {
       return this.filteredTopics[domain];
     }
     return this.getTopics(domain);
@@ -151,7 +294,7 @@ export class HomeComponent implements OnInit {
 
   getFilteredRepositories(domain: string, topic: string): string[] {
     const key = `${domain}-${topic}`;
-    if (this.searchQuery && this.filteredRepos[key]) {
+    if ((this.searchQuery || this.statusFilter !== 'all') && this.filteredRepos[key]) {
       return this.filteredRepos[key];
     }
     return this.getRepositories(domain, topic);

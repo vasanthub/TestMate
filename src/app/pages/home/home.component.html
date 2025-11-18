@@ -10,13 +10,13 @@
       class="tab-button" 
       [class.active]="activeTab === 'predefined'"
       (click)="switchTab('predefined')">
-      Predefined Tests
+      PRE-DEFINED
     </button>
     <button 
       class="tab-button" 
       [class.active]="activeTab === 'ai'"
       (click)="switchTab('ai')">
-      AI-Powered Test
+      AI-POWERED
     </button>
   </div>
 
@@ -39,6 +39,14 @@
               <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
+        </div>
+        <div class="status-filter">
+          <select [(ngModel)]="statusFilter" (change)="onStatusFilterChange()" class="status-select">
+            <option value="all">All Status</option>
+            <option value="not_started">Not Started</option>
+            <option value="started">Started</option>
+            <option value="completed">Completed</option>
+          </select>
         </div>
         <div class="search-actions">
           <button class="action-button" (click)="expandAll()">Expand All</button>
@@ -69,15 +77,44 @@
                 </svg>
               </div>
               <div class="repositories" [class.expanded]="isTopicExpanded(domain, topic)">
-                <a 
+                <div 
                   *ngFor="let repo of getFilteredRepositories(domain, topic)" 
-                  [routerLink]="['/repository', domain, topic, repo]"
-                  class="repo-link">
-                  <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span [innerHTML]="highlightMatch(repo)"></span>
-                </a>
+                  class="repo-container">
+                  <a 
+                    [routerLink]="['/repository', domain, topic, repo]"
+                    class="repo-link">
+                    <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span [innerHTML]="highlightMatch(repo)"></span>
+                    <button 
+                      class="status-badge" 
+                      [class.not-started]="getRepositoryStatus(domain, topic, repo) === 'not_started'"
+                      [class.started]="getRepositoryStatus(domain, topic, repo) === 'started'"
+                      [class.completed]="getRepositoryStatus(domain, topic, repo) === 'completed'"
+                      (click)="toggleStatusMenu(domain, topic, repo, $event)">
+                      {{ getRepositoryStatus(domain, topic, repo) === 'not_started' ? 'Not Started' : 
+                         getRepositoryStatus(domain, topic, repo) === 'started' ? 'Started' : 'Completed' }}
+                    </button>
+                  </a>
+                  <div class="status-menu" *ngIf="isStatusMenuOpen(domain, topic, repo)">
+                    <button 
+                      class="status-option not-started"
+                      (click)="updateRepositoryStatus(domain, topic, repo, 'not_started', $event)">
+                      Not Started
+                    </button>
+                    <button 
+                      class="status-option started"
+                      (click)="updateRepositoryStatus(domain, topic, repo, 'started', $event)">
+                      Started
+                    </button>
+                    <button 
+                      class="status-option completed"
+                      (click)="updateRepositoryStatus(domain, topic, repo, 'completed', $event)">
+                      Completed
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

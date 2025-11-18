@@ -116,6 +116,32 @@
   }
 }
 
+.status-filter {
+  display: flex;
+  align-items: center;
+}
+
+.status-select {
+  padding: 0.5rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+
+  &:hover {
+    border-color: #d0d0d0;
+  }
+}
+
 .search-actions {
   display: flex;
   gap: 0.5rem;
@@ -337,6 +363,10 @@ mark {
   }
 }
 
+.repo-container {
+  position: relative;
+}
+
 .repo-link {
   display: flex;
   align-items: center;
@@ -369,6 +399,109 @@ mark {
   color: var(--primary-color);
   transition: color 0.2s ease;
   flex-shrink: 0;
+}
+
+.status-badge {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  &.not-started {
+    background-color: #e0e0e0;
+    color: #666;
+
+    &:hover {
+      background-color: #d0d0d0;
+    }
+  }
+
+  &.started {
+    background-color: #fff3cd;
+    color: #856404;
+
+    &:hover {
+      background-color: #ffe69c;
+    }
+  }
+
+  &.completed {
+    background-color: #d4edda;
+    color: #155724;
+
+    &:hover {
+      background-color: #c3e6cb;
+    }
+  }
+}
+
+.status-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.25rem;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 120px;
+}
+
+.status-option {
+  padding: 0.5rem 0.8rem;
+  border: none;
+  background: white;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  &.not-started {
+    color: #666;
+    
+    &:hover {
+      background-color: #e0e0e0;
+      color: #333;
+    }
+  }
+
+  &.started {
+    color: #856404;
+    
+    &:hover {
+      background-color: #fff3cd;
+      color: #664d03;
+    }
+  }
+
+  &.completed {
+    color: #155724;
+    
+    &:hover {
+      background-color: #d4edda;
+      color: #0f4419;
+    }
+  }
 }
 
 .ai-tab {
@@ -491,6 +624,14 @@ mark {
 
   .search-box {
     width: 100%;
+  }
+
+  .status-filter {
+    width: 100%;
+    
+    .status-select {
+      width: 100%;
+    }
   }
 
   .search-actions {

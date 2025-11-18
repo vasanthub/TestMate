@@ -8,8 +8,8 @@ import { Question, TestInstance, Repository, DomainStructure } from '../models/q
   providedIn: 'root'
 })
 export class DataService {
-//private apiUrl = 'https://localhost:7221/api';
-private apiUrl = 'http://icherish.in/api3/api';
+private apiUrl = 'https://localhost:7221/api';
+//private apiUrl = 'http://icherish.in/api3/api';
 private profileName$ = new BehaviorSubject<string>('default');
 
   constructor(private http: HttpClient) {
@@ -167,4 +167,23 @@ checkAnswer(question: Question, userAnswer: number[] | string): boolean {
     const correct = attempts.filter(a => a.correct).length;
     return Math.round((correct / questions.length) * 100);
   }
+
+// Add these methods to your existing DataService
+
+getRepositoryStatuses(profileName: string = 'default'): Observable<{ [key: string]: string }> {
+  return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/repository-status?profileName=${profileName}`);
+}
+
+updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, profileName: string = 'default'): Observable<any> {
+  return this.http.put(`${this.apiUrl}/repository-status`, {
+    domain,
+    topic,
+    repository,
+    status,
+    profileName
+  });
+}
+
+
+
 }

@@ -7,7 +7,7 @@ export interface Question {
   answerText?: string;
   answerRegex?: string;
   explanation?: string;
-  type: 'single' | 'multiple' | 'text';
+  type: 'single' | 'multiple' | 'text';  
 }
 
 export interface QuestionAttempt {
@@ -15,6 +15,7 @@ export interface QuestionAttempt {
   answered?: number[] | string;
   correct: boolean;
   skipped?: boolean;
+  incorrectPreviousAttempt: boolean;
 }
 
 export interface TestInstance {

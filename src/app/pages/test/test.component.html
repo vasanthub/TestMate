@@ -40,16 +40,16 @@
         <div *ngIf="isMultipleChoice" class="options">
           <div *ngFor="let option of currentQuestion.options; let i = index" 
                class="option"
-               [class.selected]="selectedOptions[i]"
-               [class.correct-answer]="showFeedback && isCorrectOption(i)"
-               [class.wrong-answer]="showFeedback && selectedOptions[i] && !isCorrectOption(i)">
+               [class.selected]="selectedOptions[i] && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt'"
+               [class.correct-answer]="showFeedback && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt' && isCorrectOption(i)"
+               [class.wrong-answer]="showFeedback && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt' && selectedOptions[i] && !isCorrectOption(i)">
             
             <label *ngIf="isSingleAnswer" class="option-label">
               <input 
                 type="radio" 
                 [name]="'question-' + currentIndex"
-                [checked]="selectedOptions[i]"
-                [disabled]="isAnswerSubmitted"
+                [checked]="selectedOptions[i] && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt'"
+                [disabled]="isAnswerSubmitted && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt'"
                 (change)="onOptionChange(i)">
               <span class="option-content">
                 <span class="option-text" [innerHTML]="renderLatex(option)"></span>
@@ -63,7 +63,7 @@
             <label *ngIf="isMultipleAnswer" class="option-label">
               <input 
                 type="checkbox" 
-                [disabled]="isAnswerSubmitted"
+                [disabled]="isAnswerSubmitted && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt'"
                 [(ngModel)]="selectedOptions[i]">
               <span class="option-content">
                 <span class="option-text" [innerHTML]="renderLatex(option)"></span>
@@ -84,7 +84,7 @@
           <textarea *ngIf="!isTextAnswer"
             #answerInput
             [(ngModel)]="textAnswer"
-            [disabled]="isAnswerSubmitted"
+            [disabled]="isAnswerSubmitted && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt'"
             placeholder="Enter your answer here..."
             rows="4"></textarea>
           <p *ngIf="currentQuestion.answerRegex && !isTextAnswer" class="hint">
@@ -95,8 +95,8 @@
           </p>
           
           <!-- Text Answer Action Buttons - Always visible before submission -->
-          <div *ngIf="!isAnswerSubmitted" class="text-answer-actions">
-            <button class="btn btn-warning btn-sm" (click)="revealAnswer()" *ngIf="!showFeedback">
+          <div *ngIf="!isAnswerSubmitted ||  getQuestionStatus(currentIndex) === 'incorrectPreviousAttempt'" class="text-answer-actions">
+            <button class="btn btn-warning btn-sm" (click)="revealAnswer()" *ngIf="!showFeedback || getQuestionStatus(currentIndex) === 'incorrectPreviousAttempt'">
               <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2"/>
                 <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-width="2"/>
@@ -125,10 +125,7 @@
             </button>
           </div>
 
-          <div *ngIf="showFeedback && currentQuestion.explanation" class="correct-text-answer">
-            <strong>Explanation:</strong> <span [innerHTML]="renderLatex(currentQuestion.explanation)"></span>
-          </div>
-
+         
         </div>
       <!-- Answer Feedback -->
       <div *ngIf="showFeedback && isCurrentAnswerCorrect" class="answer-feedback-text">
@@ -136,10 +133,10 @@
       </div>
 
       <div class="question-actions">
-        <button *ngIf="!isAnswerSubmitted && !isTextAnswer" class="btn btn-primary btn-submit" (click)="submitAnswer()">
+        <button *ngIf="!isTextAnswer && (getQuestionStatus(currentIndex) === 'incorrectPreviousAttempt' || !isAnswerSubmitted)" class="btn btn-primary btn-submit" (click)="submitAnswer()">
           Submit Answer          
         </button>
-        <button *ngIf="isAnswerSubmitted && !isCurrentAnswerCorrect" class="btn btn-primary btn-got-it" (click)="nextQuestion()">
+        <button *ngIf="getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt' && (isAnswerSubmitted && !isCurrentAnswerCorrect)" class="btn btn-primary btn-got-it" (click)="nextQuestion()">
           Got It →          
         </button>
         <button class="btn btn-secondary" (click)="previousQuestion()" [disabled]="currentIndex === 0">
@@ -150,7 +147,7 @@
         </button>
 
       </div>
-       <div *ngIf="showFeedback && currentQuestion.explanation" class="correct-text-answer">
+       <div *ngIf="showFeedback && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt' && currentQuestion.explanation" class="correct-text-answer">
             <strong>Explanation:</strong> <span [innerHTML]="renderLatex(currentQuestion.explanation)"></span>
           </div>
     </div>
@@ -187,7 +184,7 @@
             class="question-box"
             [class.current]="i === currentIndex"
             [class.correct]="getQuestionStatus(i) === 'correct'"
-            [class.incorrect]="getQuestionStatus(i) === 'incorrect'"
+            [class.incorrect]="getQuestionStatus(i) === 'incorrect' || getQuestionStatus(i) === 'incorrectPreviousAttempt'"
             [class.unanswered]="getQuestionStatus(i) === 'unanswered'"
             (click)="goToQuestion(i)">
             {{ i + 1 }}

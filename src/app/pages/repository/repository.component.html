@@ -15,172 +15,247 @@
   </div>
 
   <div *ngIf="!loading" class="content">
-    <div class="card header-card">
-      <h1 class="title">{{ repository }}</h1>
-      <p class="subtitle">{{ domain }} • {{ topic }}</p>
-      <div class="stats">
-        <div class="stat">
-          <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>{{ questions.length }} Questions</span>
+    <div class="card header-card collapsible-section">
+      <div class="collapsible-header" (click)="toggleSection('header')">
+        <div class="header-content">
+          <h1 class="title">{{ repository }}</h1>
+          <p class="subtitle">{{ domain }} • {{ topic }}</p>
         </div>
-        <div class="stat">
-          <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>{{ savedTests.length }} Saved Tests</span>
-        </div>
+        <svg class="chevron-icon" [class.expanded]="isSectionExpanded('header')" 
+             viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
-    </div>
-
-<!-- Practice Mode -->
-    <div class="card practice-card">
-      <h2 class="section-title">Practice Mode</h2>
-      <p class="practice-description">Practice without saving results</p>
       
-      <div class="option-group">
-        <label class="checkbox-label">
-          <input type="checkbox" [(ngModel)]="useRange">
-          <span>Select question range</span>
-        </label>
-
-        <label class="checkbox-label">
-          <input type="checkbox" [(ngModel)]="clearPreviousAttempts">
-          <span>Clear Previous Attempts</span>
-        </label>
-        
-        <div *ngIf="useRange" class="range-inputs">
-          <div class="input-group">
-            <label>From:</label>
-            <input 
-              type="number" 
-              [(ngModel)]="rangeStart" 
-              (change)="validateRange()"
-              [min]="1" 
-              [max]="questions.length"
-              class="range-input">
+      <div class="collapsible-content" [class.expanded]="isSectionExpanded('header')">
+        <div class="stats">
+          <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>{{ questions.length }} Questions</span>
           </div>
-          <div class="input-group">
-            <label>To:</label>
-            <input 
-              type="number" 
-              [(ngModel)]="rangeEnd" 
-              (change)="validateRange()"
-              [min]="1" 
-              [max]="questions.length"
-              class="range-input">
+          <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>{{ savedTests.length }} Saved Tests</span>
           </div>
         </div>
       </div>
-
-      <button class="btn btn-secondary practice" (click)="startPractice()">
-        <!-- <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg> -->
-        Start Practice
-      </button>
     </div>
 
-    <!-- Saved Tests List -->
-    <!-- <div class="card tests-card" *ngIf="savedTests.length > 0">
-      <h2 class="section-title">Saved Tests</h2>
-      <div class="tests-list">
-        <div *ngFor="let test of savedTests" class="test-item">
-          <div class="test-info">
-            <h3 class="test-item-name">{{ test.test_name }}</h3>
-              <p class="test-item-range">
-                Questions {{ getQuestionStart(test) }}–{{ getQuestionEnd(test) }}
-                ({{ getQuestionCount(test) }} questions)
-              </p>
+    <div class="card practice-card collapsible-section">
+      <div class="collapsible-header" (click)="toggleSection('practice')">
+        <h2 class="section-title">
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Practice Mode
+        </h2>
+        <svg class="chevron-icon" [class.expanded]="isSectionExpanded('practice')" 
+             viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="collapsible-content" [class.expanded]="isSectionExpanded('practice')">
+        <p class="practice-description">Practice without saving results</p>
+        
+        <div class="nested-collapsible">
+          <div class="nested-header" (click)="toggleSection('practiceOptions')">
+            <span class="nested-title">
+              <svg class="nested-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Options
+            </span>
+            <svg class="chevron-icon small" [class.expanded]="isSectionExpanded('practiceOptions')" 
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
-          <div class="test-actions">
-            <button class="btn btn-primary" (click)="startTest(test)">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Start Test
-            </button>
-            <button class="btn btn-secondary btn-icon-only" (click)="deleteTest(test)" title="Delete">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
+
+          <div class="nested-content" [class.expanded]="isSectionExpanded('practiceOptions')">
+            <div class="option-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="useRange">
+                <span>Select question range</span>
+              </label>
+
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="clearPreviousAttempts">
+                <span>Clear Previous Attempts</span>
+              </label>
+
+              <!-- NOT USED CAN BE RENAMED FOR FUTURE USE -->
+              <!-- <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="hideAnswer">
+                <span>Hide Previously Attempted Answers</span>
+              </label> -->
+              
+              <div *ngIf="useRange" class="range-inputs">
+                <div class="input-group">
+                  <label>From:</label>
+                  <input 
+                    type="number" 
+                    [(ngModel)]="rangeStart" 
+                    (change)="validateRange()"
+                    [min]="1" 
+                    [max]="questions.length"
+                    class="range-input">
+                </div>
+                <div class="input-group">
+                  <label>To:</label>
+                  <input 
+                    type="number" 
+                    [(ngModel)]="rangeEnd" 
+                    (change)="validateRange()"
+                    [min]="1" 
+                    [max]="questions.length"
+                    class="range-input">
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div> -->
-    <!-- Create New Test Section -->
-    <!-- <div class="card options-card">
-      <div class="section-header">
-        <h2 class="section-title">Create New Test</h2>
-        <button *ngIf="!showCreateTest" class="btn btn-primary" (click)="showCreateTest = true">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          New Test
+
+        <button class="btn btn-primary practice" (click)="startPractice()">
+          Start Practice
         </button>
       </div>
+    </div>
 
-      <div *ngIf="showCreateTest" class="create-test-form">
-        <div class="form-group">
-          <label>Test Name</label>
-          <input 
-            type="text" 
-            [(ngModel)]="testName" 
-            class="form-input"
-            placeholder="Enter test name">
-          <p class="form-hint">Default: {{ getDefaultTestName() }}</p>
-        </div>
+    <div class="card tests-card collapsible-section" *ngIf="savedTests.length > 0">
+      <div class="collapsible-header" (click)="toggleSection('savedTests')">
+        <h2 class="section-title">
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Saved Tests ({{ savedTests.length }})
+        </h2>
+        <svg class="chevron-icon" [class.expanded]="isSectionExpanded('savedTests')" 
+             viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
 
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" [(ngModel)]="useRange" (change)="updateTestName()">
-            <span>Select question range</span>
-          </label>
-          
-          <div *ngIf="useRange" class="range-inputs">
-            <div class="input-group">
-              <label>From:</label>
-              <input 
-                type="number" 
-                [(ngModel)]="rangeStart" 
-                (change)="validateRange()"
-                [min]="1" 
-                [max]="questions.length"
-                class="range-input">
+      <div class="collapsible-content" [class.expanded]="isSectionExpanded('savedTests')">
+        <div class="tests-list">
+          <div *ngFor="let test of savedTests" class="test-item-wrapper">
+            <div class="test-item">
+              <div class="test-info" (click)="toggleSection('test-' + test.config_id)">
+                <div class="test-header-row">
+                  <h3 class="test-item-name">{{ test.test_name }}</h3>
+                  <svg class="chevron-icon small" [class.expanded]="isSectionExpanded('test-' + test.config_id)" 
+                       viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <p class="test-item-range">
+                  Questions {{ getQuestionStart(test) }}–{{ getQuestionEnd(test) }}
+                  ({{ getQuestionCount(test) }} questions)
+                </p>
+              </div>
+              
+              <div class="test-actions">
+                <button class="btn btn-primary" (click)="startTest(test); $event.stopPropagation()">
+                  Start Test
+                </button>
+                <button class="btn btn-secondary btn-icon-only" (click)="deleteTest(test); $event.stopPropagation()" title="Delete">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div class="input-group">
-              <label>To:</label>
-              <input 
-                type="number" 
-                [(ngModel)]="rangeEnd" 
-                (change)="validateRange()"
-                [min]="1" 
-                [max]="questions.length"
-                class="range-input">
+
+            <div class="test-details" [class.expanded]="isSectionExpanded('test-' + test.config_id)">
+              <div class="test-metadata">
+                <div class="metadata-item">
+                  <span class="metadata-label">Created:</span>
+                  <span class="metadata-value">{{ formatDate(test.created_on) }}</span>
+                </div>
+                <div class="metadata-item">
+                  <span class="metadata-label">Profile:</span>
+                  <span class="metadata-value">{{ test.profileName }}</span>
+                </div>
+              </div>
             </div>
-            <p class="range-info">
-              Selected: {{ rangeEnd - rangeStart + 1 }} question(s)
-            </p>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="form-actions">
-          <button class="btn btn-primary" (click)="saveTest()">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Save Test
-          </button>
-          <button class="btn btn-secondary" (click)="showCreateTest = false; resetForm()">
-            Cancel
-          </button>
+    <div class="card options-card collapsible-section">
+      <div class="collapsible-header" (click)="toggleSection('createTest')">
+        <h2 class="section-title">
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Create New Test
+        </h2>
+        <svg class="chevron-icon" [class.expanded]="isSectionExpanded('createTest')" 
+             viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="collapsible-content" [class.expanded]="isSectionExpanded('createTest')">
+        <div class="create-test-form">
+          <div class="form-group">
+            <label>Test Name</label>
+            <input 
+              type="text" 
+              [(ngModel)]="testName" 
+              class="form-input"
+              placeholder="Enter test name">
+            <p class="form-hint">Default: {{ getDefaultTestName() }}</p>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="useRange" (change)="updateTestName()">
+              <span>Select question range</span>
+            </label>
+            
+            <div *ngIf="useRange" class="range-inputs">
+              <div class="input-group">
+                <label>From:</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="rangeStart" 
+                  (change)="validateRange()"
+                  [min]="1" 
+                  [max]="questions.length"
+                  class="range-input">
+              </div>
+              <div class="input-group">
+                <label>To:</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="rangeEnd" 
+                  (change)="validateRange()"
+                  [min]="1" 
+                  [max]="questions.length"
+                  class="range-input">
+              </div>
+              <p class="range-info">
+                Selected: {{ rangeEnd - rangeStart + 1 }} question(s)
+              </p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" (click)="saveTest()">
+              Save Test
+            </button>
+            <button class="btn btn-secondary" (click)="toggleSection('createTest'); resetForm()">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
-    </div> -->
-
-
+    </div>
   </div>
 </div>

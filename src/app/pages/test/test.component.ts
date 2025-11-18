@@ -55,6 +55,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   mode: 'practice' | 'test' = 'practice';
   userAnswers: (number[] | string)[] = [];
 
+  hideAnswer: boolean=true;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -101,6 +103,11 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       const end = params['end'] ? parseInt(params['end']) : null;
       this.parentTestId = params['parentTestId'];
       this.retestType = params['retestType'];
+
+      this.hideAnswer = params['hideAnswer'] === 'true';
+      console.log("start: ", start);
+      console.log("end: ", end);
+      console.log("hideAnswer: ", this.hideAnswer);
       
       if (this.isAIGenerated)
       {
@@ -123,7 +130,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.attempts = this.questions.map((_, index) => ({
         question_index: index,
         correct: false,
-        skipped: true
+        skipped: true,
+        incorrectPreviousAttempt: false
       }));
 
       this.loading = false;
@@ -202,6 +210,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       next: (questions) => {
         const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];        
         const attemptInfoJson = localStorage.getItem('attemptInfo'+this.repository);
+        console.log("attemptInfoJson2");
+        console.log(attemptInfoJson);
         
         if (filterQuestions === 'true' && attemptInfoJson) {
           const indices: number[] = JSON.parse(attemptInfoJson);
@@ -216,18 +226,16 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         
         if (attemptInfoJson)
         {
-          this.attempts=JSON.parse(attemptInfoJson);
-          console.log("this.attempts2");
-          console.log(this.attempts);
+          this.attempts=JSON.parse(attemptInfoJson);          
         }
         else
-        {
-          console.log("this.attempts3");
+        {          
            this.attempts = this.questions.map((_, index) => ({
               question_index: index,
               correct: false,
-              skipped: true
-            }));
+              skipped: true, 
+              incorrectPreviousAttempt: false
+            }));         
         }
         
         this.loading = false;
@@ -276,19 +284,31 @@ startTimer(): void {
       }
       if (!attempt.skipped) {
         this.isAnswerSubmitted = true;
+        if (attempt.incorrectPreviousAttempt) this.isAnswerSubmitted = false;
         this.isCurrentAnswerCorrect = attempt.correct;
         this.showFeedback = true;
+        if (attempt.incorrectPreviousAttempt) this.showFeedback = false;
       }
     } else {
       this.textAnswer = (this.attempts[this.currentIndex].answered as string) || '';
       const attempt = this.attempts[this.currentIndex];
       if (!attempt.skipped) {
         this.isAnswerSubmitted = true;
+        if (attempt.incorrectPreviousAttempt) this.isAnswerSubmitted = false;
         this.isCurrentAnswerCorrect = attempt.correct;
         this.showFeedback = true;
+        if (attempt.incorrectPreviousAttempt) this.showFeedback = false;
       }
     }
-    
+
+    //this.showFeedback = !this.hideAnswer;
+
+    console.log("Summary333333333333:");
+    console.log("showFeedback", this.showFeedback);
+    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
+    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
+    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
+
     this.focusAnswerInput();
   }
 
@@ -333,6 +353,7 @@ startTimer(): void {
 
   submitAnswer(): void {
     const attempt = this.attempts[this.currentIndex];
+    attempt.incorrectPreviousAttempt=false;
     
     if (this.isMultipleChoice) {
       const selected = this.selectedOptions
@@ -357,7 +378,7 @@ startTimer(): void {
     }
     
     this.isAnswerSubmitted = true;
-    this.isCurrentAnswerCorrect = attempt.correct;
+    this.isCurrentAnswerCorrect = attempt.correct;    
     this.showFeedback = true;
     
     if (this.isCurrentAnswerCorrect) {
@@ -370,7 +391,12 @@ startTimer(): void {
   }
 
   revealAnswer(): void {
-    this.showFeedback = true;
+    console.log("Summary:");
+    console.log("showFeedback", this.showFeedback);
+    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
+    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
+    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
+    this.showFeedback = true;    
   }
 
   markAsCorrect(): void {
@@ -394,6 +420,7 @@ startTimer(): void {
     const attempt = this.attempts[this.currentIndex];
     attempt.correct = false;
     attempt.skipped = false;
+    attempt.incorrectPreviousAttempt=true;
     if (!attempt.answered) {
       attempt.answered = this.textAnswer.trim();
     }
@@ -410,6 +437,8 @@ startTimer(): void {
   goToQuestion(index: number): void {
     this.currentIndex = index;
     this.initializeAnswer();
+
+
   }
 
   nextQuestion(): void {
@@ -417,6 +446,11 @@ startTimer(): void {
       this.currentIndex++;
       this.initializeAnswer();
     }
+    console.log("Summary2:");    
+    console.log("showFeedback", this.showFeedback);
+    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
+    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
+    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
   }
 
   previousQuestion(): void {
@@ -424,11 +458,17 @@ startTimer(): void {
       this.currentIndex--;
       this.initializeAnswer();
     }
+        console.log("Summary2:");
+    console.log(this.showFeedback);
+    console.log(this.isAnswerSubmitted);
+    console.log(this.getQuestionStatus(this.currentIndex));
   }
 
   getQuestionStatus(index: number): string {
     const attempt = this.attempts[index];
     if (attempt.skipped) return 'unanswered';
+    if (attempt.correct) return 'correct';
+    if (attempt.incorrectPreviousAttempt) return 'incorrectPreviousAttempt';
     return attempt.correct ? 'correct' : 'incorrect';
   }
 
@@ -465,12 +505,19 @@ startTimer(): void {
 
   finishTest(): void {
     this.finalScore = this.dataService.calculateScore(this.questions, this.attempts);
+
+    this.attempts = this.attempts.map(a => ({
+            ...a,
+            incorrectPreviousAttempt: !a.skipped && !a.correct
+          }));
     
     const incorrectIndices = this.attempts
       .map((a, i) => !a.correct && !a.skipped ? i : -1)
       .filter(i => i !== -1);
     
+    console.log('finishTest');
     console.log(incorrectIndices);
+    console.log(this.attempts);
 
     //if (incorrectIndices.length > 0)     
     localStorage.setItem('attemptInfo'+this.repository, JSON.stringify(this.attempts));

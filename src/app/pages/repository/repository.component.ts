@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { trigger, transition, style, animate } from '@angular/animations';
 import { DataService } from '../../services/data.service';
 import { Question } from '../../models/question.model';
 import { TestConfiguration, TestAttempt } from '../../models/test-config.model';
@@ -12,18 +11,7 @@ import { TestConfiguration, TestAttempt } from '../../models/test-config.model';
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './repository.component.html',
-  styleUrls: ['./repository.component.scss'],
-  animations: [
-    trigger('expandCollapse', [
-      transition(':enter', [
-        style({ height: '0', opacity: 0 }),
-        animate('300ms ease-out', style({ height: '*', opacity: 1 }))
-      ]),
-      transition(':leave', [
-        animate('300ms ease-in', style({ height: '0', opacity: 0 }))
-      ])
-    ])
-  ]
+  styleUrls: ['./repository.component.scss']
 })
 export class RepositoryComponent implements OnInit {
   domain: string = '';
@@ -35,14 +23,24 @@ export class RepositoryComponent implements OnInit {
   rangeStart: number = 1;
   rangeEnd: number = 0;
   useRange: boolean = true;
-  clearPreviousAttempts: boolean= false;
+  clearPreviousAttempts: boolean = false;
   testName: string = '';
   
   savedTests: TestConfiguration[] = [];
   testAttempts: { [testId: string]: TestAttempt[] } = {};
-  expandedTests: { [testId: string]: boolean } = {};
+  
+  expandedSections: { [key: string]: boolean } = {
+    'header': true,
+    'practice': true,
+    'practiceOptions': false,
+    'savedTests': true,
+    'createTest': false
+  };
+  
   loadingAttempts: { [testId: string]: boolean } = {};
   showCreateTest: boolean = false;
+
+  hideAnswer: boolean = true; //NOT USED - CAN BE RENAMED FOR FUTURE NEED
 
   constructor(
     private route: ActivatedRoute,
@@ -58,6 +56,21 @@ export class RepositoryComponent implements OnInit {
       this.loadQuestions();
       this.loadSavedTests();
     });
+  }
+
+  toggleSection(sectionId: string): void {
+    this.expandedSections[sectionId] = !this.expandedSections[sectionId];
+    
+    if (sectionId.startsWith('test-') && this.expandedSections[sectionId]) {
+      const testId = sectionId.replace('test-', '');
+      if (!this.testAttempts[testId]) {
+        this.loadTestAttempts(testId);
+      }
+    }
+  }
+
+  isSectionExpanded(sectionId: string): boolean {
+    return this.expandedSections[sectionId] || false;
   }
 
   loadQuestions(): void {
@@ -86,14 +99,6 @@ export class RepositoryComponent implements OnInit {
     });
   }
 
-  toggleTestExpansion(testId: string): void {
-    this.expandedTests[testId] = !this.expandedTests[testId];
-    
-    if (this.expandedTests[testId] && !this.testAttempts[testId]) {
-      this.loadTestAttempts(testId);
-    }
-  }
-
   loadTestAttempts(testId: string): void {
     this.loadingAttempts[testId] = true;
     this.dataService.getTestAttempts(testId).subscribe({
@@ -108,11 +113,8 @@ export class RepositoryComponent implements OnInit {
     });
   }
 
-  isExpanded(testId: string): boolean {
-    return this.expandedTests[testId] || false;
-  }
-
-  getAttempts(testId: string): TestAttempt[] {
+  getAttempts(testId: string | undefined): TestAttempt[] {
+    if (!testId) return [];
     return this.testAttempts[testId] || [];
   }
 
@@ -137,6 +139,12 @@ export class RepositoryComponent implements OnInit {
   formatDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  formatAttemptDate(attempt: TestAttempt): string {
+    const dateString = (attempt as any).completed_on || (attempt as any).created_on || '';
+    if (!dateString) return 'N/A';
+    return this.formatDate(dateString);
   }
 
   updateTestName(): void {
@@ -173,7 +181,7 @@ export class RepositoryComponent implements OnInit {
 
     this.dataService.saveTestConfiguration(config).subscribe({
       next: () => {
-        this.showCreateTest = false;
+        this.expandedSections['createTest'] = false;
         this.loadSavedTests();
         this.resetForm();
       },
@@ -214,7 +222,8 @@ export class RepositoryComponent implements OnInit {
       queryParams: {
         testConfigId: testConfig.config_id,
         start: testConfig.question_range.start,
-        end: testConfig.question_range.end
+        end: testConfig.question_range.end,
+        hideAnswer: this.hideAnswer
       }
     });
   }
@@ -232,13 +241,15 @@ export class RepositoryComponent implements OnInit {
   }
 
   startPractice(): void {
-    if (this.clearPreviousAttempts)
-      localStorage.setItem('attemptInfo'+this.repository, "");
+    if (this.clearPreviousAttempts) {
+      localStorage.setItem('attemptInfo' + this.repository, "");
+    }
     
     const queryParams: any = { practice: 'true' };
     if (this.useRange) {
       queryParams.start = this.rangeStart;
       queryParams.end = this.rangeEnd;
+      queryParams.hideAnswer = this.hideAnswer;
     }
     this.router.navigate(['/practice', this.domain, this.topic, this.repository], { queryParams });
   }
@@ -252,6 +263,10 @@ export class RepositoryComponent implements OnInit {
     if (confirm(`Delete test "${testConfig.test_name}" and all its attempts?`)) {
       this.dataService.deleteTestConfiguration(testConfig.config_id).subscribe({
         next: () => {
+          if (testConfig.config_id) {
+            delete this.expandedSections['test-' + testConfig.config_id];
+            delete this.testAttempts[testConfig.config_id];
+          }
           this.loadSavedTests();
         },
         error: (err) => {

@@ -21,32 +21,68 @@
   </div>
 
   <div class="tab-content">
-    <div *ngIf="!loading && activeTab === 'predefined'" class="domains">
-        <div *ngFor="let domain of domains" class="domain-card">
-          <div class="domain-header">
+    <div *ngIf="!loading && activeTab === 'predefined'" class="predefined-content">
+      
+      <div class="search-section">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input 
+            type="text" 
+            [(ngModel)]="searchQuery"
+            (input)="onSearch()"
+            placeholder="Search domains, topics, or repositories..."
+            class="search-input">
+          <button *ngIf="searchQuery" (click)="clearSearch()" class="clear-button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="search-actions">
+          <button class="action-button" (click)="expandAll()">Expand All</button>
+          <button class="action-button" (click)="collapseAll()">Collapse All</button>
+        </div>
+      </div>
+
+      <div class="domains">
+        <div *ngFor="let domain of getFilteredDomains()" class="domain-card">
+          <div class="domain-header" (click)="toggleDomain(domain)">
             <svg class="domain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <h2 class="domain-title">{{ domain }}</h2>
+            <svg class="chevron-icon" [class.expanded]="isDomainExpanded(domain)" 
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
           
-          <div class="topics">
-            <div *ngFor="let topic of getTopics(domain)" class="topic-card">
-              <h3 class="topic-title">{{ topic }}</h3>
-              <div class="repositories">
+          <div class="topics" [class.expanded]="isDomainExpanded(domain)">
+            <div *ngFor="let topic of getFilteredTopics(domain)" class="topic-card">
+              <div class="topic-header" (click)="toggleTopic(domain, topic)">
+                <h3 class="topic-title">{{ topic }}</h3>
+                <svg class="chevron-icon small" [class.expanded]="isTopicExpanded(domain, topic)" 
+                     viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="repositories" [class.expanded]="isTopicExpanded(domain, topic)">
                 <a 
-                  *ngFor="let repo of getRepositories(domain, topic)" 
+                  *ngFor="let repo of getFilteredRepositories(domain, topic)" 
                   [routerLink]="['/repository', domain, topic, repo]"
                   class="repo-link">
                   <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
-                  <span>{{ repo }}</span>
+                  <span [innerHTML]="highlightMatch(repo)"></span>
                 </a>
               </div>
             </div>
           </div>
         </div>
+      </div>
     </div>
 
     <div *ngIf="activeTab === 'ai'" class="ai-tab">

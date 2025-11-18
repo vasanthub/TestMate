@@ -8,8 +8,8 @@ import { Question, TestInstance, Repository, DomainStructure } from '../models/q
   providedIn: 'root'
 })
 export class DataService {
-private apiUrl = 'https://localhost:7221/api';
-//private apiUrl = 'http://icherish.in/api3/api';
+//private apiUrl = 'https://localhost:7221/api';
+private apiUrl = 'http://icherish.in/api3/api';
 private profileName$ = new BehaviorSubject<string>('default');
 
   constructor(private http: HttpClient) {

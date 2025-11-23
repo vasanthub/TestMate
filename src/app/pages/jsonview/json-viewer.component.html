@@ -1,0 +1,84 @@
+<div class="container">
+  <div class="header">
+    <h1>JSON Tree Viewer</h1>
+    <input 
+      type="text" 
+      class="search-box" 
+      placeholder="Search in JSON data..."
+      (input)="onSearch($event)">
+  </div>
+
+  <div class="input-section">
+    <div class="input-header" (click)="toggleInput()">
+      <h2>JSON Input</h2>
+      <span class="toggle-icon" [class.collapsed]="isInputCollapsed">▼</span>
+    </div>
+    <div class="input-body" [class.collapsed]="isInputCollapsed">
+      <div class="file-upload-section">
+        <input 
+          type="file" 
+          id="fileInput" 
+          accept=".json" 
+          style="display: none;"
+          (change)="onFileSelected($event)">
+        <button class="btn-secondary" (click)="triggerFileInput()">📁 Load JSON File</button>
+        <button 
+          class="btn-primary" 
+          *ngIf="showRefreshButton"
+          (click)="onRefresh()">🔄 Refresh</button>
+        <span class="file-name">{{ fileName }}</span>
+      </div>
+      <textarea 
+        [(ngModel)]="jsonInputText"
+        placeholder="Paste your JSON here or load from file..."></textarea>      
+        <div class="button-group">
+        <button class="btn-primary" (click)="onRender()">Render JSON</button>
+        <button class="btn-secondary" (click)="onClear()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="results">
+    <div *ngIf="treeData.length === 0" class="no-results">
+      Paste JSON and click "Render JSON" to view
+    </div>
+
+    <div *ngIf="treeData.length > 0" class="tree">
+      <ng-container *ngFor="let node of treeData">
+        <ng-container *ngTemplateOutlet="treeNode; context: { node: node, level: 0 }"></ng-container>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<ng-template #treeNode let-node="node" let-level="level">
+  <div class="tree-item" [style.margin-left.px]="level * 20">
+    <div class="tree-node">
+      <span 
+        class="expand-icon" 
+        (click)="toggleNode(node)"
+        *ngIf="node.isArray || node.isObject">
+        {{ node.isExpanded ? '▼' : '▶' }}
+      </span>
+      <span class="expand-icon" *ngIf="!node.isArray && !node.isObject"></span>
+      
+      <span class="key" [innerHTML]="highlightText(node.key)"></span>
+      
+      <ng-container *ngIf="node.isArray || node.isObject">
+        <!-- <span class="bracket">{{ node.value }}</span> -->
+        <span *ngIf="node.originalIndex !== null && node.originalIndex !== undefined" 
+              class="original-index">Question: {{ node.originalIndex+1 }}</span>
+      </ng-container>
+      
+      <ng-container *ngIf="!node.isArray && !node.isObject">
+        : <span [ngClass]="getValueClass(node.type)" [innerHTML]="highlightText(node.value)"></span>
+      </ng-container>
+    </div>
+
+    <div *ngIf="(node.isArray || node.isObject) && node.isExpanded && node.children">
+      <ng-container *ngFor="let child of node.children">
+        <ng-container *ngTemplateOutlet="treeNode; context: { node: child, level: level + 1 }"></ng-container>
+      </ng-container>
+    </div>
+  </div>
+</ng-template>

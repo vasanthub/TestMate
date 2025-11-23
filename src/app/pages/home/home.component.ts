@@ -32,10 +32,13 @@ export class HomeComponent implements OnInit {
   statusFilter: string = 'all';
   openStatusMenu: string | null = null;
 
+  profileName: string = "default";
+
   constructor(private route: ActivatedRoute,
     private router: Router, private dataService: DataService) {}
 
   ngOnInit(): void {
+    this.profileName=this.dataService.getProfileName();
     this.loadStructure();
     this.loadRepositoryStatuses();
   }
@@ -56,7 +59,7 @@ export class HomeComponent implements OnInit {
   }
 
   loadRepositoryStatuses(): void {
-    this.dataService.getRepositoryStatuses().subscribe({
+    this.dataService.getRepositoryStatuses(this.profileName).subscribe({
       next: (statuses) => {
         this.repositoryStatuses = statuses;
       },
@@ -75,7 +78,7 @@ export class HomeComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     
-    this.dataService.updateRepositoryStatus(domain, topic, repository, status).subscribe({
+    this.dataService.updateRepositoryStatus(domain, topic, repository, status, this.profileName).subscribe({
       next: () => {
         const key = `${domain}|${topic}|${repository}`;
         this.repositoryStatuses[key] = status;

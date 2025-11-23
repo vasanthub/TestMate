@@ -17,9 +17,22 @@
           <button class="btn-icon" (click)="copyQuestionToClipboard()" title="Copy question">
             📑           
           </button>
+         
+          <button class="btn-icon" (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 1, $event)"  title="Image Upload">
+            📁1
+          </button>
+          <button class="btn-icon" (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 2, $event)"  title="Image Upload">
+            📁2
+          </button>
+          <button class="btn-icon" (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 3, $event)"  title="Image Upload">
+            📁3
+          </button>
+          <button class="btn-icon" (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 4, $event)"  title="Image Upload">
+            📁4
+          </button>
           <button class="btn-icon" (click)="toggleTimer()" title="Toggle timer">
             ⏱️
-          </button>
+          </button>          
           <button class="btn btn-success" (click)="finishTest()">
           Finish Test
         </button>  
@@ -30,10 +43,15 @@
       </div>
 
       <div class="question-content">
-        <div class="question-text" [innerHTML]="renderLatex(currentQuestion.question)"></div>
+        <div class="question-text">
+          <ng-container *ngFor="let line of (currentQuestion.question || '').split('\n')">
+            <span [innerHTML]="renderLatex(line)"></span>
+            <br>
+          </ng-container>
+        </div>
         
         <div *ngIf="currentQuestion.question_image" class="question-image">
-          <img [src]="currentQuestion.question_image" alt="Question image">
+          <img [src]="getQuestionImage(1)" alt="Question image">
         </div>
 
         <!-- Multiple Choice Options -->
@@ -79,6 +97,14 @@
 
       </div>
 
+      
+          <div *ngIf="isAnswerSubmitted && !isTextAnswer && currentQuestion.answer_image" class="correct-text-answer">            
+            <strong>Diagram:</strong> 
+            <div *ngIf="currentQuestion.answer_image" class="question-image">
+              <img [src]="getQuestionImage(3)" alt="Answer image">
+            </div>
+          </div>
+
         <!-- Text Answer -->
         <div *ngIf="isTextAnswer" class="text-answer">
           <textarea *ngIf="!isTextAnswer"
@@ -105,8 +131,18 @@
             </button>            
           </div>
 
-          <div *ngIf="showFeedback" class="correct-text-answer">
-            <strong>Correct Answer:</strong> <span [innerHTML]="renderLatex(currentQuestion.answerText || '')"></span>
+
+          <div *ngIf="showFeedback" class="correct-text-answer">            
+            <strong>Correct Answer:</strong> 
+            <div *ngIf="currentQuestion.answer_image" class="question-image">
+              <img [src]="getQuestionImage(3)" alt="Answer image">
+            </div>
+            <div>
+              <ng-container *ngFor="let line of (currentQuestion.answerText || '').split('\n')">
+                <span [innerHTML]="renderLatex(line)"></span>
+                <br>
+              </ng-container>
+            </div>
           </div>
 
           <!-- Manual marking buttons after reveal -->
@@ -148,7 +184,13 @@
 
       </div>
        <div *ngIf="showFeedback && getQuestionStatus(currentIndex) !== 'incorrectPreviousAttempt' && currentQuestion.explanation" class="correct-text-answer">
-            <strong>Explanation:</strong> <span [innerHTML]="renderLatex(currentQuestion.explanation)"></span>
+            <strong>Explanation:</strong> 
+            <div>
+              <ng-container *ngFor="let line of currentQuestion.explanation.split('\n')">
+                <span [innerHTML]="renderLatex(line)"></span>
+                <br>
+              </ng-container>
+            </div>
           </div>
     </div>
 

@@ -242,7 +242,7 @@ export class RepositoryComponent implements OnInit {
 
   startPractice(): void {
     if (this.clearPreviousAttempts) {
-      localStorage.setItem('attemptInfo' + this.repository, "");
+      localStorage.setItem(this.topic + '_' + this.repository, "");
     }
     
     const queryParams: any = { practice: 'true' };

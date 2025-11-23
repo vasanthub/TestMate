@@ -8,9 +8,9 @@ import { Question, TestInstance, Repository, DomainStructure } from '../models/q
   providedIn: 'root'
 })
 export class DataService {
-private apiUrl = 'https://localhost:7221/api';
-//private apiUrl = 'http://icherish.in/api3/api';
-private profileName$ = new BehaviorSubject<string>('default');
+//private apiUrl = 'https://localhost:7221/api';
+private apiUrl = 'http://icherish.in/api3/api';
+private profileName$ = new BehaviorSubject<string>('Jade');
 
   constructor(private http: HttpClient) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -77,7 +77,7 @@ private profileName$ = new BehaviorSubject<string>('default');
   }
 
   deleteTestConfiguration(configId: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/test-configurations/${configId}`);
+    return this.http.post(`${this.apiUrl}/test-configurations/${configId}/delete`,null);
   }
 
 checkAnswer(question: Question, userAnswer: number[] | string): boolean {
@@ -175,7 +175,7 @@ getRepositoryStatuses(profileName: string = 'default'): Observable<{ [key: strin
 }
 
 updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, profileName: string = 'default'): Observable<any> {
-  return this.http.put(`${this.apiUrl}/repository-status`, {
+  return this.http.post(`${this.apiUrl}/repository-status`, {
     domain,
     topic,
     repository,
@@ -184,6 +184,44 @@ updateRepositoryStatus(domain: string, topic: string, repository: string, status
   });
 }
 
+updateQuestionImageUrl(
+  domain: string,
+  topic: string,
+  repository: string,
+  questionIndex: number,
+  imageIndex: number,
+  imageUrl: string
+): Observable<any> {
+  return this.http.post(`${this.apiUrl}/question-image-url`, {
+    domain,
+    topic,
+    repository,
+    questionIndex,
+    imageIndex,
+    imageUrl
+  });
+}
+
+uploadImageFromClipboard(
+  domain: string,
+  topic: string,
+  repository: string,
+  questionIndex: number,
+  imageBlob: Blob,
+  imageName: string,
+  imageIndex: number
+): Observable<any> {
+  const formData = new FormData();
+  formData.append('domain', domain);
+  formData.append('topic', topic);
+  formData.append('repository', repository);
+  formData.append('questionIndex', questionIndex.toString());
+  formData.append('imageName', imageName);
+  formData.append('imageIndex', imageIndex.toString());  
+  formData.append('image', imageBlob, `${imageName}.png`);
+
+  return this.http.post(`${this.apiUrl}/upload-clipboard-image`, formData);
+}
 
 
 }

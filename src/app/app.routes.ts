@@ -21,6 +21,10 @@ export const routes: Routes = [
     path: 'practice/:domain/:topic/:repository',
     loadComponent: () => import('./pages/test/test.component').then(m => m.TestComponent)
   },
+{
+    path: 'jsonview',
+    loadComponent: () => import('./pages/jsonview/json-viewer.component').then(m => m.JsonViewerComponent)
+  },  
   {
     path: '**',
     redirectTo: ''

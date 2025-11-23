@@ -1,10 +1,13 @@
 export interface Question {
   question: string;
   question_image?: string;
+  question_image2?: string;
   options?: string[];
   options_image?: (string | null)[];
   answer: number | number[] | string;
   answerText?: string;
+  answer_image?: string;
+  answer_image2?: string;
   answerRegex?: string;
   explanation?: string;
   type: 'single' | 'multiple' | 'text';  

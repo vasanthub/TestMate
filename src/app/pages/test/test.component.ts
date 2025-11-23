@@ -163,6 +163,17 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         this.nextQuestion();
       }
     }
+
+    if ((event.ctrlKey || event.metaKey) && event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.nextQuestion();
+    }
+    
+    if ((event.ctrlKey || event.metaKey) && event.key === 'ArrowLeft') {
+      event.preventDefault();
+      this.previousQuestion();
+    }
+    
   };
 
   focusAnswerInput(): void {
@@ -205,11 +216,110 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   
+ 
+
+  updateQuestionImageUrl(
+    domain: string,
+    topic: string,
+    repository: string,
+    questionIndex: number,
+    imageUrl: string,
+    event: Event
+  ): void {
+  event.preventDefault();
+  event.stopPropagation();
+    
+
+  this.dataService.updateQuestionImageUrl(domain, topic, repository, questionIndex, 1, imageUrl).subscribe({
+      next: () => {
+        const key = `${domain}|${topic}|${repository}|${questionIndex}`;
+        // Update local cache or state if needed
+        // this.questionImageUrls[key] = imageUrl;
+        // this.openImageUrlMenu = null;
+        
+        // Optional: Show success notification
+        console.log(`Image URL updated successfully for question at index ${questionIndex}`);
+      },
+      error: (err) => {
+        console.error('Error updating question image URL:', err);
+        // Optional: Show error notification to user
+      }
+    });
+  }
+
+// ANGULAR COMPONENT METHOD
+uploadImageFromClipboard(
+  domain: string,
+  topic: string,
+  repository: string,
+  questionIndex: number,
+  imageIndex: number,
+  event: Event
+): void {
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Prompt user for image name
+  //const imageName = prompt('Enter image name (without extension):');
+  const imageName = '';
+  // if (!imageName || imageName.trim() === '') {
+  //   console.log('Image upload cancelled');
+  //   return;
+  // }
+
+  // Access clipboard
+  navigator.clipboard.read().then((clipboardItems) => {
+    if (clipboardItems.length === 0) {
+      alert('No items in clipboard');
+      return;
+    }
+
+    const clipboardItem = clipboardItems[0];
+    if (!clipboardItem.types.some(type => type.startsWith('image/'))) {
+      alert('Clipboard does not contain an image');
+      return;
+    }
+
+    const imageType = clipboardItem.types.find(type => type.startsWith('image/'));
+    if (!imageType) {
+      alert('Could not determine image type');
+      return;
+    }
+
+    clipboardItem.getType(imageType).then((blob) => {
+      this.dataService.uploadImageFromClipboard(
+        domain,
+        topic,
+        repository,
+        questionIndex,
+        blob,
+        imageName,
+        imageIndex
+      ).subscribe({
+        next: (response) => {
+          this.ClipboardCopyStatus="Image uploaded successfully";
+          // alert(`Image uploaded successfully: ${response.imageUrl}`);
+          // Update your question with the image URL if needed
+        },
+        error: (err) => {
+          console.error('Error uploading image:', err);
+          alert('Failed to upload image');
+        }
+      });
+    });
+  }).catch((err) => {
+    console.error('Error accessing clipboard:', err);
+    alert('Failed to access clipboard');
+  });
+}
+
+
+  
   loadQuestions(start?: number | null, end?: number | null): void {
     this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
       next: (questions) => {
         const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];        
-        const attemptInfoJson = localStorage.getItem('attemptInfo'+this.repository);
+        const attemptInfoJson = localStorage.getItem(this.topic + '_' + this.repository);
         console.log("attemptInfoJson2");
         console.log(attemptInfoJson);
         
@@ -273,6 +383,7 @@ startTimer(): void {
     this.isAnswerSubmitted = false;
     this.isCurrentAnswerCorrect = false;
     this.showFeedback = false;
+    this.ClipboardCopyStatus="";
     
     if (question.options) {
       this.selectedOptions = new Array(question.options.length).fill(false);
@@ -339,10 +450,10 @@ startTimer(): void {
     return !this.isMultipleChoice || !!(this.currentQuestion.answerText || this.currentQuestion.answerRegex);
   }
 
-  renderLatex(text: string): SafeHtml {
-    const rendered = this.latexService.renderLatex(text);
-    return this.sanitizer.bypassSecurityTrustHtml(rendered);
-  }
+renderLatex(text: string): SafeHtml {
+  const rendered = this.latexService.renderLatex(text);
+  return this.sanitizer.bypassSecurityTrustHtml(rendered);
+}
 
   onOptionChange(index: number): void {
     if (this.isSingleAnswer) {
@@ -437,20 +548,13 @@ startTimer(): void {
   goToQuestion(index: number): void {
     this.currentIndex = index;
     this.initializeAnswer();
-
-
   }
 
   nextQuestion(): void {
     if (this.currentIndex < this.questions.length - 1) {
       this.currentIndex++;
       this.initializeAnswer();
-    }
-    console.log("Summary2:");    
-    console.log("showFeedback", this.showFeedback);
-    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
-    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
-    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
+    }  
   }
 
   previousQuestion(): void {
@@ -470,6 +574,25 @@ startTimer(): void {
     if (attempt.correct) return 'correct';
     if (attempt.incorrectPreviousAttempt) return 'incorrectPreviousAttempt';
     return attempt.correct ? 'correct' : 'incorrect';
+  }
+
+  getQuestionImage(imageIndex: number): string {
+    if (imageIndex==1)
+      var imageUrl = this.currentQuestion.question_image;
+    if (imageIndex==3)
+      var imageUrl = this.currentQuestion.answer_image;
+    
+    if (!imageUrl) {
+      return '';
+    }
+
+    // Check if it's already a complete URL
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+
+    // Prefix with the base URL if it's not a complete URL
+    return `http://icherish.in/files/images/testmate/${imageUrl}`;
   }
 
   isCorrectOption(index: number): boolean {
@@ -520,7 +643,7 @@ startTimer(): void {
     console.log(this.attempts);
 
     //if (incorrectIndices.length > 0)     
-    localStorage.setItem('attemptInfo'+this.repository, JSON.stringify(this.attempts));
+    localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
     
 
     if (!this.isPractice) {

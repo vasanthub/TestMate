@@ -223,5 +223,30 @@ uploadImageFromClipboard(
   return this.http.post(`${this.apiUrl}/upload-clipboard-image`, formData);
 }
 
+savePracticeAttempts(
+  domain: string,
+  topic: string,
+  repository: string,
+  profileName: string,
+  attempts: any[]
+): Observable<any> {
+  return this.http.post(`${this.apiUrl}/practice-attempts`, {
+    domain,
+    topic,
+    repository,
+    profileName,
+    attempts
+  });
+}
+
+getPracticeAttempts(
+  domain: string,
+  topic: string,
+  repository: string,
+  profileName?: string
+): Observable<any[]> {
+  const profile = profileName || this.getProfileName();
+  return this.http.get<any[]>(`${this.apiUrl}/practice-attempts?domain=${domain}&topic=${topic}&repository=${repository}&profileName=${profile}`);
+}
 
 }

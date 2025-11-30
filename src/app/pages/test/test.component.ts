@@ -319,38 +319,57 @@ uploadImageFromClipboard(
     this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
       next: (questions) => {
         const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];        
-        const attemptInfoJson = localStorage.getItem(this.topic + '_' + this.repository);
-        console.log("attemptInfoJson2");
-        console.log(attemptInfoJson);
         
-        if (filterQuestions === 'true' && attemptInfoJson) {
-          const indices: number[] = JSON.parse(attemptInfoJson);
-          this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);          
-        } 
-        else if (start && end) {
-          this.questions = questions.slice(start - 1, end);
-        }
-        else {
-          this.questions = questions;
-        }
-        
-        if (attemptInfoJson)
-        {
-          this.attempts=JSON.parse(attemptInfoJson);          
-        }
-        else
-        {          
-           this.attempts = this.questions.map((_, index) => ({
+        // Load practice attempts from server
+        this.dataService.getPracticeAttempts(this.domain, this.topic, this.repository).subscribe({
+          next: (serverAttempts) => {
+            console.log("serverAttempts loaded");
+            console.log(serverAttempts);
+            
+            if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
+              const indices: number[] = serverAttempts.map(a => a.question_index);
+              this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);          
+            } 
+            else if (start && end) {
+              this.questions = questions.slice(start - 1, end);
+            }
+            else {
+              this.questions = questions;
+            }
+            
+            if (serverAttempts && serverAttempts.length > 0)
+            {
+              this.attempts = serverAttempts;          
+            }
+            else
+            {          
+               this.attempts = this.questions.map((_, index) => ({
+                  question_index: index,
+                  correct: false,
+                  skipped: true, 
+                  incorrectPreviousAttempt: false
+                }));         
+            }
+            
+            this.loading = false;
+            this.testStarted = true;
+            this.initializeAnswer();
+          },
+          error: (err) => {
+            console.error('Error loading practice attempts:', err);
+            // Initialize with default attempts if server fetch fails
+            this.attempts = this.questions.map((_, index) => ({
               question_index: index,
               correct: false,
               skipped: true, 
               incorrectPreviousAttempt: false
-            }));         
-        }
-        
-        this.loading = false;
-        this.testStarted = true;
-        this.initializeAnswer();
+            }));
+            
+            this.loading = false;
+            this.testStarted = true;
+            this.initializeAnswer();
+          }
+        });
       },
       error: (err) => {
         console.error('Error loading questions:', err);
@@ -642,8 +661,24 @@ renderLatex(text: string): SafeHtml {
     console.log(incorrectIndices);
     console.log(this.attempts);
 
-    //if (incorrectIndices.length > 0)     
-    localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
+    // Save to server instead of localStorage
+    const profileName = this.dataService.getProfileName();
+    this.dataService.savePracticeAttempts(
+      this.domain,
+      this.topic,
+      this.repository,
+      profileName,
+      this.attempts
+    ).subscribe({
+      next: () => {
+        console.log('Practice attempts saved successfully to server');
+      },
+      error: (err) => {
+        console.error('Error saving practice attempts to server:', err);
+        // Fallback to localStorage if server save fails
+        localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
+      }
+    });
     
 
     if (!this.isPractice) {

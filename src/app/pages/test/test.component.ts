@@ -57,6 +57,15 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
   hideAnswer: boolean=true;
 
+  showMoveQuestionDialog: boolean = false;
+  availableRepositories: string[] = [];
+  selectedTargetRepository: string = '';
+  isMovingQuestion: boolean = false;
+
+  // Add these properties to TestComponent class
+  showDeleteQuestionDialog: boolean = false;
+  isDeletingQuestion: boolean = false;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -869,4 +878,149 @@ renderLatex(text: string): SafeHtml {
       alert('Failed to copy to clipboard');
     });
   }
+
+  
+openMoveQuestionDialog(): void {
+  this.showMoveQuestionDialog = true;
+  this.loadAvailableRepositories();
+}
+
+closeMoveQuestionDialog(): void {
+  this.showMoveQuestionDialog = false;
+  this.selectedTargetRepository = '';
+}
+
+loadAvailableRepositories(): void {
+  this.dataService.getRepositoriesForTopic(this.domain, this.topic).subscribe({
+    next: (repositories) => {
+      // Filter out the current repository
+      this.availableRepositories = repositories.filter(repo => repo !== this.repository);
+    },
+    error: (err) => {
+      console.error('Error loading repositories:', err);
+      alert('Failed to load available repositories');
+    }
+  });
+}
+
+moveCurrentQuestion(): void {
+  if (!this.selectedTargetRepository) {
+    alert('Please select a target repository');
+    return;
+  }
+
+  const confirmMove = confirm(
+    `Are you sure you want to move this question from "${this.repository}" to "${this.selectedTargetRepository}"?\n\n` +
+    `This action cannot be undone and will:\n` +
+    `- Remove the question from the current repository\n` +
+    `- Add it to the target repository\n` +
+    `- Reload the current test`
+  );
+
+  if (!confirmMove) {
+    return;
+  }
+
+  this.isMovingQuestion = true;
+
+  this.dataService.moveQuestion(
+    this.domain,
+    this.topic,
+    this.repository,
+    this.currentIndex,
+    this.selectedTargetRepository
+  ).subscribe({
+    next: () => {
+      //alert(`Question successfully moved to "${this.selectedTargetRepository}"`);
+      this.closeMoveQuestionDialog();
+      
+      // Reload the questions to reflect the change
+      this.reloadQuestions();
+    },
+    error: (err) => {
+      console.error('Error moving question:', err);
+      alert('Failed to move question: ' + (err.error?.message || err.message));
+      this.isMovingQuestion = false;
+    }
+  });
+}
+
+reloadQuestions(): void {
+  this.loading = true;
+  
+  this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
+    next: (questions) => {
+      this.questions = questions;
+      
+      // Adjust current index if it's now out of bounds
+      if (this.currentIndex >= this.questions.length) {
+        this.currentIndex = Math.max(0, this.questions.length - 1);
+      }
+      
+      // Reinitialize attempts
+      this.attempts = this.questions.map((_, index) => ({
+        question_index: index,
+        correct: false,
+        skipped: true,
+        incorrectPreviousAttempt: false
+      }));
+      
+      this.loading = false;
+      this.isMovingQuestion = false;
+      this.initializeAnswer();
+    },
+    error: (err) => {
+      console.error('Error reloading questions:', err);
+      alert('Failed to reload questions. Redirecting to home.');
+      this.router.navigate(['/']);
+    }
+  });
+}
+
+// Add these methods to TestComponent class
+
+openDeleteQuestionDialog(): void {
+  this.showDeleteQuestionDialog = true;
+}
+
+closeDeleteQuestionDialog(): void {
+  this.showDeleteQuestionDialog = false;
+}
+
+deleteCurrentQuestion(): void {
+  const confirmDelete = confirm(
+    `Are you sure you want to DELETE this question?\n\n` +
+    `Repository: ${this.repository}\n` +
+    `Question ${this.currentIndex + 1} of ${this.questions.length}\n\n` +
+    `This action CANNOT be undone!\n` +
+    `The question will be permanently removed from the repository.`
+  );
+
+  if (!confirmDelete) {
+    return;
+  }
+
+  this.isDeletingQuestion = true;
+
+  this.dataService.deleteQuestion(
+    this.domain,
+    this.topic,
+    this.repository,
+    this.currentIndex
+  ).subscribe({
+    next: () => {
+      //alert('Question successfully deleted');
+      this.closeDeleteQuestionDialog();
+      
+      // Reload the questions to reflect the change
+      this.reloadQuestions();
+    },
+    error: (err) => {
+      console.error('Error deleting question:', err);
+      alert('Failed to delete question: ' + (err.error?.message || err.message));
+      this.isDeletingQuestion = false;
+    }
+  });
+}
+
 }

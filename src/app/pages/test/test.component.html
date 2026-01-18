@@ -13,6 +13,18 @@
         </div>
         <div class="header-actions">
           <span class="clipboard-label">{{ClipboardCopyStatus}}</span>
+
+          <button class="btn-icon" 
+        (click)="openMoveQuestionDialog()" 
+        title="Move question to another repository">
+          📦
+        </button>
+
+        <button class="btn-icon btn-icon-danger" 
+        (click)="openDeleteQuestionDialog()" 
+        title="Delete question">
+          🗑️
+        </button>
           
           <button class="btn-icon" (click)="copyQuestionToClipboard()" title="Copy question">
             📑           
@@ -302,6 +314,109 @@
       </div>
     </div>
   </div>
+
+  <!-- Move Question Dialog -->
+<div *ngIf="showMoveQuestionDialog" class="modal-overlay" (click)="closeMoveQuestionDialog()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Move Question to Repository</h2>
+      <button class="btn-close" (click)="closeMoveQuestionDialog()">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="current-question-info">
+        <p><strong>Current Repository:</strong> {{ repository }}</p>
+        <p><strong>Question {{ currentIndex + 1 }} of {{ questions.length }}</strong></p>
+        <div class="question-preview">
+          {{ currentQuestion.question.substring(0, 100) }}{{ currentQuestion.question.length > 100 ? '...' : '' }}
+        </div>
+      </div>
+
+      <div class="repository-selection">
+        <label for="targetRepository">Select Target Repository:</label>
+        <select 
+          id="targetRepository" 
+          [(ngModel)]="selectedTargetRepository"
+          class="repository-select"
+          [disabled]="isMovingQuestion">
+          <option value="">-- Choose a repository --</option>
+          <option *ngFor="let repo of availableRepositories" [value]="repo">
+            {{ repo }}
+          </option>
+        </select>
+      </div>
+
+      <div class="warning-message">
+        <svg class="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Warning: This action cannot be undone. The question will be removed from the current repository and added to the target repository.</p>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button 
+        class="btn btn-secondary" 
+        (click)="closeMoveQuestionDialog()"
+        [disabled]="isMovingQuestion">
+        Cancel
+      </button>
+      <button 
+        class="btn btn-primary" 
+        (click)="moveCurrentQuestion()"
+        [disabled]="!selectedTargetRepository || isMovingQuestion">
+        <span *ngIf="!isMovingQuestion">Move Question</span>
+        <span *ngIf="isMovingQuestion">Moving...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Question Dialog -->
+<div *ngIf="showDeleteQuestionDialog" class="modal-overlay" (click)="closeDeleteQuestionDialog()">
+  <div class="modal-dialog modal-dialog-danger" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Delete Question</h2>
+      <button class="btn-close" (click)="closeDeleteQuestionDialog()">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="current-question-info danger-info">
+        <p><strong>Repository:</strong> {{ repository }}</p>
+        <p><strong>Question {{ currentIndex + 1 }} of {{ questions.length }}</strong></p>
+        <div class="question-preview">
+          {{ currentQuestion.question.substring(0, 150) }}{{ currentQuestion.question.length > 150 ? '...' : '' }}
+        </div>
+      </div>
+
+      <div class="danger-message">
+        <svg class="danger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <p class="danger-title">⚠️ PERMANENT ACTION</p>
+          <p>This action CANNOT be undone! The question will be permanently removed from the repository JSON file.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button 
+        class="btn btn-secondary" 
+        (click)="closeDeleteQuestionDialog()"
+        [disabled]="isDeletingQuestion">
+        Cancel
+      </button>
+      <button 
+        class="btn btn-danger" 
+        (click)="deleteCurrentQuestion()"
+        [disabled]="isDeletingQuestion">
+        <span *ngIf="!isDeletingQuestion">🗑️ Delete Question</span>
+        <span *ngIf="isDeletingQuestion">Deleting...</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 <div *ngIf="loading" class="loading">
   <div class="spinner"></div>

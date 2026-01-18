@@ -53,6 +53,11 @@ export class RepositoryComponent implements OnInit {
       this.domain = params['domain'];
       this.topic = params['topic'];
       this.repository = params['repository'];
+      
+      localStorage.setItem("selectedDomain", this.domain);
+      localStorage.setItem("selectedTopic", this.topic);
+      localStorage.setItem("selectedrepository", this.repository);
+
       this.loadQuestions();
       this.loadSavedTests();
     });
@@ -242,9 +247,28 @@ export class RepositoryComponent implements OnInit {
 
   startPractice(): void {
     if (this.clearPreviousAttempts) {
-      localStorage.setItem(this.topic + '_' + this.repository, "");
+      this.dataService.deletePracticeAttempts(
+        this.domain,
+        this.topic,
+        this.repository,
+        this.dataService.getProfileName()
+      ).subscribe({
+        next: () => {
+          console.log('Previous practice attempts cleared successfully');
+          this.navigateToPractice();
+        },
+        error: (err) => {
+          console.error('Error clearing practice attempts:', err);
+          // Still navigate even if delete fails
+          this.navigateToPractice();
+        }
+      });
+    } else {
+      this.navigateToPractice();
     }
-    
+  }
+
+  private navigateToPractice(): void {
     const queryParams: any = { practice: 'true' };
     if (this.useRange) {
       queryParams.start = this.rangeStart;

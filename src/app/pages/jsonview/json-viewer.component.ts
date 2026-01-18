@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DataService } from '../../services/data.service';
 
 interface TreeNode {
   key: string | number;
@@ -30,26 +31,27 @@ export class JsonViewerComponent implements OnInit {
   treeData: TreeNode[] = [];
   showRefreshButton: boolean = false;
 
+  domain: string| null = '';
+  topic: string| null = '';
+  repository: string| null = '';
+
+
+  constructor(
+      private dataService: DataService
+    ) {}
+  
+
   ngOnInit(): void {
-    // Load from localStorage if available
-    //const savedContent = localStorage.getItem('jsonViewerContent');
-    const savedFileName = localStorage.getItem('jsonViewerFileName');
-    
-    // if (savedContent) {
-    //   this.jsonInputText = savedContent;
-    //   this.fileName = savedFileName || '';
-    //   try {
-    //     this.jsonData = JSON.parse(savedContent);
-    //     this.renderJSON();
-    //     this.isInputCollapsed = true;
-    //   } catch (err) {
-    //     console.error('Error loading saved content:', err);
-    //   }
-    // }
+    this.domain=localStorage.getItem("selectedDomain");
+    this.topic=localStorage.getItem("selectedTopic");
+    this.repository=localStorage.getItem("selectedrepository");
+   
+    this.loadQuestions();    
   }
 
   onFileSelected(event: any): void {
     const file = event.target.files[0];
+    console.log(file);
     if (file) {
       this.currentFile = file;
       const reader = new FileReader();
@@ -58,11 +60,8 @@ export class JsonViewerComponent implements OnInit {
         const content = e.target.result;
         this.jsonInputText = content;
         
-        // Save to localStorage
-        //localStorage.setItem('jsonViewerContent', content);
-        localStorage.setItem('jsonViewerFileName', file.name);
-        
         this.fileName = `Loaded: ${file.name}`;
+        
         this.showRefreshButton = true;
         
         try {
@@ -136,6 +135,21 @@ export class JsonViewerComponent implements OnInit {
   triggerFileInput(): void {
     const fileInput = document.getElementById('fileInput') as HTMLInputElement;
     fileInput?.click();
+  }
+
+  loadQuestions(): void {
+    if (this.domain && this.topic && this.repository){
+      this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
+            next: (questions) => {              
+              this.jsonData=questions;
+              this.renderJSON();
+              this.isInputCollapsed = true;              
+            },
+            error: (err) => {
+              console.error('Error loading questions:', err);              
+            }
+          });
+    }
   }
 
   renderJSON(): void {

@@ -8,8 +8,8 @@ import { Question, TestInstance, Repository, DomainStructure } from '../models/q
   providedIn: 'root'
 })
 export class DataService {
-//private apiUrl = 'https://localhost:7221/api';
-private apiUrl = 'http://icherish.in/api3/api';
+private apiUrl = 'https://localhost:7221/api';
+//private apiUrl = 'http://icherish.in/api3/api';
 private profileName$ = new BehaviorSubject<string>('Jade');
 
   constructor(private http: HttpClient) {
@@ -247,6 +247,57 @@ getPracticeAttempts(
 ): Observable<any[]> {
   const profile = profileName || this.getProfileName();
   return this.http.get<any[]>(`${this.apiUrl}/practice-attempts?domain=${domain}&topic=${topic}&repository=${repository}&profileName=${profile}`);
+}
+
+deletePracticeAttempts(
+  domain: string,
+  topic: string,
+  repository: string,
+  profileName?: string
+): Observable<any> {
+  const profile = profileName || this.getProfileName();
+  return this.http.post(`${this.apiUrl}/practice-attempts/delete?domain=${domain}&topic=${topic}&repository=${repository}&profileName=${profile}`, null);
+}
+
+// Add these methods to your existing data.service.ts
+
+// Get all repositories for a topic (excluding current one)
+getRepositoriesForTopic(domain: string, topic: string): Observable<string[]> {
+  return this.http.get<string[]>(`${this.apiUrl}/repositories/${domain}/${topic}`);
+}
+
+// Move question from one repository to another
+moveQuestion(
+  sourceDomain: string,
+  sourceTopic: string,
+  sourceRepository: string,
+  questionIndex: number,
+  targetRepository: string
+): Observable<any> {
+  return this.http.post(`${this.apiUrl}/move-question`, {
+    sourceDomain,
+    sourceTopic,
+    sourceRepository,
+    questionIndex,
+    targetRepository
+  });
+}
+
+// Add this method to data.service.ts
+
+// Delete question from repository
+deleteQuestion(
+  domain: string,
+  topic: string,
+  repository: string,
+  questionIndex: number
+): Observable<any> {
+  return this.http.post(`${this.apiUrl}/delete-question`, {
+    domain,
+    topic,
+    repository,
+    questionIndex
+  });
 }
 
 }

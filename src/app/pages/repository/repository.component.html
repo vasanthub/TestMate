@@ -2,9 +2,9 @@
   <div class="breadcrumb">
     <a routerLink="/">Home</a>
     <span class="separator">/</span>
-    <span>{{ domain }}</span>
+    <a routerLink="/" [queryParams]="{ domain: domain }">{{ domain }}</a>
     <span class="separator">/</span>
-    <span>{{ topic }}</span>
+    <a routerLink="/" [queryParams]="{ domain: domain, topic: topic }">{{ topic }}</a>
     <span class="separator">/</span>
     <span class="current">{{ repository }}</span>
   </div>

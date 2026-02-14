@@ -10,7 +10,7 @@ export interface Question {
   answer_image2?: string;
   answerRegex?: string;
   explanation?: string;
-  type: 'single' | 'multiple' | 'text';  
+  type: 'single' | 'multiple' | 'text';
 }
 
 export interface QuestionAttempt {
@@ -19,6 +19,7 @@ export interface QuestionAttempt {
   correct: boolean;
   skipped?: boolean;
   incorrectPreviousAttempt: boolean;
+  time_taken?: string;
 }
 
 export interface TestInstance {

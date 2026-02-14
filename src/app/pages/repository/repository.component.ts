@@ -19,16 +19,16 @@ export class RepositoryComponent implements OnInit {
   repository: string = '';
   questions: Question[] = [];
   loading = true;
-  
+
   rangeStart: number = 1;
   rangeEnd: number = 0;
   useRange: boolean = true;
   clearPreviousAttempts: boolean = false;
   testName: string = '';
-  
+
   savedTests: TestConfiguration[] = [];
   testAttempts: { [testId: string]: TestAttempt[] } = {};
-  
+
   expandedSections: { [key: string]: boolean } = {
     'header': true,
     'practice': true,
@@ -36,7 +36,7 @@ export class RepositoryComponent implements OnInit {
     'savedTests': true,
     'createTest': false
   };
-  
+
   loadingAttempts: { [testId: string]: boolean } = {};
   showCreateTest: boolean = false;
 
@@ -46,14 +46,14 @@ export class RepositoryComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dataService: DataService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
       this.domain = params['domain'];
       this.topic = params['topic'];
       this.repository = params['repository'];
-      
+
       localStorage.setItem("selectedDomain", this.domain);
       localStorage.setItem("selectedTopic", this.topic);
       localStorage.setItem("selectedrepository", this.repository);
@@ -65,7 +65,7 @@ export class RepositoryComponent implements OnInit {
 
   toggleSection(sectionId: string): void {
     this.expandedSections[sectionId] = !this.expandedSections[sectionId];
-    
+
     if (sectionId.startsWith('test-') && this.expandedSections[sectionId]) {
       const testId = sectionId.replace('test-', '');
       if (!this.testAttempts[testId]) {
@@ -255,6 +255,8 @@ export class RepositoryComponent implements OnInit {
       ).subscribe({
         next: () => {
           console.log('Previous practice attempts cleared successfully');
+          const cacheKey = `${this.topic}_${this.repository}`;
+          localStorage.removeItem(cacheKey);
           this.navigateToPractice();
         },
         error: (err) => {

@@ -38,9 +38,20 @@ export class HomeComponent implements OnInit {
     private router: Router, private dataService: DataService) {}
 
   ngOnInit(): void {
-    this.profileName=this.dataService.getProfileName();
+    this.profileName = this.dataService.getProfileName();
     this.loadStructure();
     this.loadRepositoryStatuses();
+
+    // Expand sections based on query params (from breadcrumbs)
+    this.route.queryParams.subscribe(params => {
+      if (params['domain']) {
+        this.expandedDomains[params['domain']] = true;
+        if (params['topic']) {
+          const key = `${params['domain']}-${params['topic']}`;
+          this.expandedTopics[key] = true;
+        }
+      }
+    });
   }
 
   loadStructure(): void {

@@ -16,36 +16,36 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 })
 export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('answerInput') answerInput?: ElementRef;
-   @ViewChild('timerText', { static: false }) timerText!: ElementRef<HTMLDivElement>;
-   
+  @ViewChild('timerText', { static: false }) timerText!: ElementRef<HTMLDivElement>;
+
   domain: string = '';
   topic: string = '';
   repository: string = '';
   isPractice: boolean = false;
-  
+
   questions: Question[] = [];
   currentIndex: number = 0;
   attempts: QuestionAttempt[] = [];
-  
+
   userAnswer: any = null;
   selectedOptions: boolean[] = [];
   textAnswer: string = '';
-  
+
   startTime: Date = new Date();
   elapsedTime: string = '00:00';
   timerInterval: any;
   showTimer: boolean = false; // Default OFF
-  
+
   showResult: boolean = false;
   finalScore: number = 0;
-  
+
   loading = true;
   testStarted = false;
-  
+
   isAnswerSubmitted: boolean = false;
   isCurrentAnswerCorrect: boolean = false;
   showFeedback: boolean = false;
-  
+
   parentTestId?: string;
   retestType?: string;
 
@@ -55,16 +55,20 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   mode: 'practice' | 'test' = 'practice';
   userAnswers: (number[] | string)[] = [];
 
-  hideAnswer: boolean=true;
+  hideAnswer: boolean = true;
 
+  // Move / Delete properties
   showMoveQuestionDialog: boolean = false;
   availableRepositories: string[] = [];
   selectedTargetRepository: string = '';
   isMovingQuestion: boolean = false;
-
-  // Add these properties to TestComponent class
   showDeleteQuestionDialog: boolean = false;
   isDeletingQuestion: boolean = false;
+  selectedQuestionIndices: Set<number> = new Set<number>();
+  isSelectMode: boolean = false;
+  showStats: boolean = localStorage.getItem('show_test_stats') === 'true';
+  lastQuestionTime: string = '00:00';
+  questionStartTime: number = Date.now();
 
   constructor(
     private route: ActivatedRoute,
@@ -85,11 +89,11 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.repository = state.testData.repository;
       this.mode = state.testData.mode || 'practice';
       this.isAIGenerated = state.testData.isAIGenerated || false;
-      
+
       if (this.isAIGenerated) {
         this.aiGeneratedQuestions = [...this.questions];
       }
-      
+
       this.initializeAnswers();
     }
   }
@@ -117,35 +121,34 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       console.log("start: ", start);
       console.log("end: ", end);
       console.log("hideAnswer: ", this.hideAnswer);
-      
-      if (this.isAIGenerated)
-      {
-          this.loadAIQuestions();
-          this.initializeAnswer();
+
+      if (this.isAIGenerated) {
+        this.loadAIQuestions();
+        this.initializeAnswer();
       }
-      else{
+      else {
         this.loadQuestions(start, end);
       }
-        
+
     });
 
     this.startTimer();
-    
+
     // Add keyboard listener for Ctrl+Enter
     document.addEventListener('keyup', this.handleKeyPress);
   }
 
-  loadAIQuestions(){   
-      this.attempts = this.questions.map((_, index) => ({
-        question_index: index,
-        correct: false,
-        skipped: true,
-        incorrectPreviousAttempt: false
-      }));
+  loadAIQuestions() {
+    this.attempts = this.questions.map((_, index) => ({
+      question_index: index,
+      correct: false,
+      skipped: true,
+      incorrectPreviousAttempt: false
+    }));
 
-      this.loading = false;
-      this.testStarted = true;
-    }
+    this.loading = false;
+    this.testStarted = true;
+  }
 
 
   initializeAnswers(): void {
@@ -177,12 +180,12 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       event.preventDefault();
       this.nextQuestion();
     }
-    
+
     if ((event.ctrlKey || event.metaKey) && event.key === 'ArrowLeft') {
       event.preventDefault();
       this.previousQuestion();
     }
-    
+
   };
 
   focusAnswerInput(): void {
@@ -203,29 +206,29 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     this.showTimer = !this.showTimer;
   }
 
-  ClipboardCopyStatus: string="";
+  ClipboardCopyStatus: string = "";
   copyQuestionToClipboard(): void {
     const question = this.currentQuestion;
     let text = question.question;
-    
+
     if (question.options) {
       text += '\n\nOptions:\n';
       question.options.forEach((opt, idx) => {
         text += `${idx + 1}. ${opt}\n`;
       });
     }
-    this.ClipboardCopyStatus="Copied!";
+    this.ClipboardCopyStatus = "Copied!";
     navigator.clipboard.writeText(text).then(() => {
       setTimeout(() => {
-        this.ClipboardCopyStatus="";
+        this.ClipboardCopyStatus = "";
       }, 400);
     }).catch(err => {
       console.error('Failed to copy:', err);
     });
   }
 
-  
- 
+
+
 
   updateQuestionImageUrl(
     domain: string,
@@ -235,17 +238,17 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     imageUrl: string,
     event: Event
   ): void {
-  event.preventDefault();
-  event.stopPropagation();
-    
+    event.preventDefault();
+    event.stopPropagation();
 
-  this.dataService.updateQuestionImageUrl(domain, topic, repository, questionIndex, 1, imageUrl).subscribe({
+
+    this.dataService.updateQuestionImageUrl(domain, topic, repository, questionIndex, 1, imageUrl).subscribe({
       next: () => {
         const key = `${domain}|${topic}|${repository}|${questionIndex}`;
         // Update local cache or state if needed
         // this.questionImageUrls[key] = imageUrl;
         // this.openImageUrlMenu = null;
-        
+
         // Optional: Show success notification
         console.log(`Image URL updated successfully for question at index ${questionIndex}`);
       },
@@ -256,124 +259,147 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-// ANGULAR COMPONENT METHOD
-uploadImageFromClipboard(
-  domain: string,
-  topic: string,
-  repository: string,
-  questionIndex: number,
-  imageIndex: number,
-  event: Event
-): void {
-  event.preventDefault();
-  event.stopPropagation();
+  // ANGULAR COMPONENT METHOD
+  uploadImageFromClipboard(
+    domain: string,
+    topic: string,
+    repository: string,
+    questionIndex: number,
+    imageIndex: number,
+    event: Event
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
 
-  // Prompt user for image name
-  //const imageName = prompt('Enter image name (without extension):');
-  const imageName = '';
-  // if (!imageName || imageName.trim() === '') {
-  //   console.log('Image upload cancelled');
-  //   return;
-  // }
+    // Prompt user for image name
+    //const imageName = prompt('Enter image name (without extension):');
+    const imageName = '';
+    // if (!imageName || imageName.trim() === '') {
+    //   console.log('Image upload cancelled');
+    //   return;
+    // }
 
-  // Access clipboard
-  navigator.clipboard.read().then((clipboardItems) => {
-    if (clipboardItems.length === 0) {
-      alert('No items in clipboard');
-      return;
-    }
+    // Access clipboard
+    navigator.clipboard.read().then((clipboardItems) => {
+      if (clipboardItems.length === 0) {
+        alert('No items in clipboard');
+        return;
+      }
 
-    const clipboardItem = clipboardItems[0];
-    if (!clipboardItem.types.some(type => type.startsWith('image/'))) {
-      alert('Clipboard does not contain an image');
-      return;
-    }
+      const clipboardItem = clipboardItems[0];
+      if (!clipboardItem.types.some(type => type.startsWith('image/'))) {
+        alert('Clipboard does not contain an image');
+        return;
+      }
 
-    const imageType = clipboardItem.types.find(type => type.startsWith('image/'));
-    if (!imageType) {
-      alert('Could not determine image type');
-      return;
-    }
+      const imageType = clipboardItem.types.find(type => type.startsWith('image/'));
+      if (!imageType) {
+        alert('Could not determine image type');
+        return;
+      }
 
-    clipboardItem.getType(imageType).then((blob) => {
-      this.dataService.uploadImageFromClipboard(
-        domain,
-        topic,
-        repository,
-        questionIndex,
-        blob,
-        imageName,
-        imageIndex
-      ).subscribe({
-        next: (response) => {
-          this.ClipboardCopyStatus="Image uploaded successfully";
-          // alert(`Image uploaded successfully: ${response.imageUrl}`);
-          // Update your question with the image URL if needed
-        },
-        error: (err) => {
-          console.error('Error uploading image:', err);
-          alert('Failed to upload image');
-        }
+      clipboardItem.getType(imageType).then((blob) => {
+        this.dataService.uploadImageFromClipboard(
+          domain,
+          topic,
+          repository,
+          questionIndex,
+          blob,
+          imageName,
+          imageIndex
+        ).subscribe({
+          next: (response) => {
+            this.ClipboardCopyStatus = "Image uploaded successfully";
+            // alert(`Image uploaded successfully: ${response.imageUrl}`);
+            // Update your question with the image URL if needed
+          },
+          error: (err) => {
+            console.error('Error uploading image:', err);
+            alert('Failed to upload image');
+          }
+        });
       });
+    }).catch((err) => {
+      console.error('Error accessing clipboard:', err);
+      alert('Failed to access clipboard');
     });
-  }).catch((err) => {
-    console.error('Error accessing clipboard:', err);
-    alert('Failed to access clipboard');
-  });
-}
+  }
 
 
-  
+
   loadQuestions(start?: number | null, end?: number | null): void {
     this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
       next: (questions) => {
-        const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];        
-        
+        const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];
+
         // Load practice attempts from server
         this.dataService.getPracticeAttempts(this.domain, this.topic, this.repository).subscribe({
           next: (serverAttempts) => {
             console.log("serverAttempts loaded");
             console.log(serverAttempts);
-            
+
             if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
               const indices: number[] = serverAttempts.map(a => a.question_index);
-              this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);          
-            } 
+              this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);
+            }
             else if (start && end) {
               this.questions = questions.slice(start - 1, end);
             }
             else {
               this.questions = questions;
             }
-            
-            if (serverAttempts && serverAttempts.length > 0)
-            {
-              this.attempts = serverAttempts;          
+
+            if (serverAttempts && serverAttempts.length > 0) {
+              this.attempts = serverAttempts;
+              // Ensure attempts length matches questions length (e.g. after moving/adding questions)
+              if (this.attempts.length < this.questions.length) {
+                const paddingCount = this.questions.length - this.attempts.length;
+                for (let i = 0; i < paddingCount; i++) {
+                  const nextIndex = this.attempts.length;
+                  this.attempts.push({
+                    question_index: nextIndex,
+                    correct: false,
+                    skipped: true,
+                    incorrectPreviousAttempt: false
+                  });
+                }
+              }
             }
-            else
-            {          
-               this.attempts = this.questions.map((_, index) => ({
+            else {
+              const localData = localStorage.getItem(this.topic + '_' + this.repository);
+              if (localData) {
+                this.attempts = JSON.parse(localData);
+                console.log('Loaded attempts from localStorage');
+              } else {
+                this.attempts = this.questions.map((_, index) => ({
                   question_index: index,
                   correct: false,
-                  skipped: true, 
+                  skipped: true,
                   incorrectPreviousAttempt: false
-                }));         
+                }));
+              }
             }
-            
+
             this.loading = false;
             this.testStarted = true;
             this.initializeAnswer();
           },
           error: (err) => {
             console.error('Error loading practice attempts:', err);
-            // Initialize with default attempts if server fetch fails
-            this.attempts = this.questions.map((_, index) => ({
-              question_index: index,
-              correct: false,
-              skipped: true, 
-              incorrectPreviousAttempt: false
-            }));
-            
+            // Try to load from localStorage if server fetch fails
+            const localData = localStorage.getItem(this.topic + '_' + this.repository);
+            if (localData) {
+              this.attempts = JSON.parse(localData);
+              console.log('Loaded attempts from localStorage after error');
+            } else {
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false
+              }));
+            }
+
             this.loading = false;
             this.testStarted = true;
             this.initializeAnswer();
@@ -387,32 +413,95 @@ uploadImageFromClipboard(
     });
   }
 
-startTimer(): void {
-  this.ngZone.runOutsideAngular(() => {
-    this.timerInterval = setInterval(() => {
-      const now = new Date();
-      const diff = now.getTime() - this.startTime.getTime();
-      const minutes = Math.floor(diff / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
+  startTimer(): void {
+    this.ngZone.runOutsideAngular(() => {
+      this.timerInterval = setInterval(() => {
+        const now = new Date();
+        const diff = now.getTime() - this.startTime.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
 
-      const newElapsed = `${minutes.toString().padStart(2, '0')}:${seconds
-        .toString()
-        .padStart(2, '0')}`;
+        const newElapsed = `${minutes.toString().padStart(2, '0')}:${seconds
+          .toString()
+          .padStart(2, '0')}`;
 
-      // ✅ update DOM directly — stay outside Angular zone
-      this.timerText.nativeElement.textContent = newElapsed;
-    }, 1000);
+        // ✅ update DOM directly — stay outside Angular zone
+        if (this.timerText) {
+          this.timerText.nativeElement.textContent = newElapsed;
+        }
+
+        // Also update the property for data binding in the new stats section
+        if (this.showStats) {
+          this.ngZone.run(() => {
+            this.elapsedTime = newElapsed;
+          });
+        } else {
+          this.elapsedTime = newElapsed;
+        }
+      }, 1000);
     });
-}
+  }
+
+  toggleStats(): void {
+    this.showStats = !this.showStats;
+    localStorage.setItem('show_test_stats', this.showStats.toString());
+  }
+
+  updateLastQuestionTime(): string {
+    const end = Date.now();
+    const diff = end - this.questionStartTime;
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    this.lastQuestionTime = timeStr;
+
+    // Store in the attempt object as well
+    if (this.attempts[this.currentIndex]) {
+      this.attempts[this.currentIndex].time_taken = timeStr;
+    }
+
+    return timeStr;
+  }
+
+  get correctPercent(): number {
+    return this.answeredCount > 0 ? (this.correctCount / this.answeredCount) * 100 : 0;
+  }
+
+  get averageTime(): string {
+    if (!this.attempts || this.attempts.length === 0) return '00:00';
+
+    const timedAttempts = this.attempts.filter(a => a && a.time_taken);
+    if (timedAttempts.length === 0) return '00:00';
+
+    let totalSeconds = 0;
+    timedAttempts.forEach(a => {
+      if (a.time_taken) {
+        const parts = a.time_taken.split(':');
+        if (parts.length === 2) {
+          const m = parseInt(parts[0]);
+          const s = parseInt(parts[1]);
+          if (!isNaN(m) && !isNaN(s)) {
+            totalSeconds += (m * 60) + s;
+          }
+        }
+      }
+    });
+
+    const avgSeconds = Math.round(totalSeconds / timedAttempts.length);
+    const mins = Math.floor(avgSeconds / 60);
+    const secs = avgSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
 
   initializeAnswer(): void {
+    this.questionStartTime = Date.now();
     const question = this.questions[this.currentIndex];
-    
+
     this.isAnswerSubmitted = false;
     this.isCurrentAnswerCorrect = false;
     this.showFeedback = false;
-    this.ClipboardCopyStatus="";
-    
+    this.ClipboardCopyStatus = "";
+
     if (question.options) {
       this.selectedOptions = new Array(question.options.length).fill(false);
       const attempt = this.attempts[this.currentIndex];
@@ -422,21 +511,17 @@ startTimer(): void {
         });
       }
       if (!attempt.skipped) {
-        this.isAnswerSubmitted = true;
-        if (attempt.incorrectPreviousAttempt) this.isAnswerSubmitted = false;
+        this.isAnswerSubmitted = false;
         this.isCurrentAnswerCorrect = attempt.correct;
-        this.showFeedback = true;
-        if (attempt.incorrectPreviousAttempt) this.showFeedback = false;
+        this.showFeedback = false;
       }
     } else {
       this.textAnswer = (this.attempts[this.currentIndex].answered as string) || '';
       const attempt = this.attempts[this.currentIndex];
       if (!attempt.skipped) {
-        this.isAnswerSubmitted = true;
-        if (attempt.incorrectPreviousAttempt) this.isAnswerSubmitted = false;
+        this.isAnswerSubmitted = false;
         this.isCurrentAnswerCorrect = attempt.correct;
-        this.showFeedback = true;
-        if (attempt.incorrectPreviousAttempt) this.showFeedback = false;
+        this.showFeedback = false;
       }
     }
 
@@ -444,9 +529,9 @@ startTimer(): void {
 
     console.log("Summary333333333333:");
     console.log("showFeedback", this.showFeedback);
-    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
-    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
-    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
+    console.log("isAnswerSubmitted", this.isAnswerSubmitted);
+    console.log("incorrectPreviousAttempt", this.attempts[this.currentIndex].incorrectPreviousAttempt);
+    console.log("getQuestionStatus", this.getQuestionStatus(this.currentIndex));
 
     this.focusAnswerInput();
   }
@@ -478,10 +563,10 @@ startTimer(): void {
     return !this.isMultipleChoice || !!(this.currentQuestion.answerText || this.currentQuestion.answerRegex);
   }
 
-renderLatex(text: string): SafeHtml {
-  const rendered = this.latexService.renderLatex(text);
-  return this.sanitizer.bypassSecurityTrustHtml(rendered);
-}
+  renderLatex(text: string): SafeHtml {
+    const rendered = this.latexService.renderLatex(text);
+    return this.sanitizer.bypassSecurityTrustHtml(rendered);
+  }
 
   onOptionChange(index: number): void {
     if (this.isSingleAnswer) {
@@ -492,13 +577,13 @@ renderLatex(text: string): SafeHtml {
 
   submitAnswer(): void {
     const attempt = this.attempts[this.currentIndex];
-    attempt.incorrectPreviousAttempt=false;
-    
+    attempt.incorrectPreviousAttempt = false;
+
     if (this.isMultipleChoice) {
       const selected = this.selectedOptions
         .map((val, idx) => val ? idx + 1 : null)
         .filter(val => val !== null) as number[];
-      
+
       if (selected.length > 0) {
         attempt.answered = selected;
         attempt.correct = this.dataService.checkAnswer(this.currentQuestion, selected);
@@ -515,11 +600,14 @@ renderLatex(text: string): SafeHtml {
         return;
       }
     }
-    
+
+    this.updateLastQuestionTime();
     this.isAnswerSubmitted = true;
-    this.isCurrentAnswerCorrect = attempt.correct;    
+    this.isCurrentAnswerCorrect = attempt.correct;
     this.showFeedback = true;
-    
+
+    this.saveProgress();
+
     if (this.isCurrentAnswerCorrect) {
       setTimeout(() => {
         if (this.currentIndex < this.questions.length - 1) {
@@ -532,10 +620,10 @@ renderLatex(text: string): SafeHtml {
   revealAnswer(): void {
     console.log("Summary:");
     console.log("showFeedback", this.showFeedback);
-    console.log("isAnswerSubmitted",this.isAnswerSubmitted);
-    console.log("incorrectPreviousAttempt",this.attempts[this.currentIndex].incorrectPreviousAttempt);    
-    console.log("getQuestionStatus",this.getQuestionStatus(this.currentIndex));
-    this.showFeedback = true;    
+    console.log("isAnswerSubmitted", this.isAnswerSubmitted);
+    console.log("incorrectPreviousAttempt", this.attempts[this.currentIndex].incorrectPreviousAttempt);
+    console.log("getQuestionStatus", this.getQuestionStatus(this.currentIndex));
+    this.showFeedback = true;
   }
 
   markAsCorrect(): void {
@@ -547,7 +635,10 @@ renderLatex(text: string): SafeHtml {
     }
     this.isCurrentAnswerCorrect = true;
     this.showFeedback = true;
-    
+    this.updateLastQuestionTime();
+
+    this.saveProgress();
+
     setTimeout(() => {
       if (this.currentIndex < this.questions.length - 1) {
         this.nextQuestion();
@@ -559,12 +650,15 @@ renderLatex(text: string): SafeHtml {
     const attempt = this.attempts[this.currentIndex];
     attempt.correct = false;
     attempt.skipped = false;
-    attempt.incorrectPreviousAttempt=true;
+    attempt.incorrectPreviousAttempt = true;
     if (!attempt.answered) {
       attempt.answered = this.textAnswer.trim();
     }
     this.isCurrentAnswerCorrect = false;
     this.showFeedback = true;
+    this.updateLastQuestionTime();
+
+    this.saveProgress();
 
     setTimeout(() => {
       if (this.currentIndex < this.questions.length - 1) {
@@ -573,7 +667,31 @@ renderLatex(text: string): SafeHtml {
     }, 100);
   }
 
+  markAsUnattempted(): void {
+    const attempt = this.attempts[this.currentIndex];
+    attempt.correct = false;
+    attempt.skipped = true;
+    attempt.incorrectPreviousAttempt = false;
+    attempt.answered = undefined;
+    attempt.time_taken = undefined;
+
+    this.isAnswerSubmitted = false;
+    this.isCurrentAnswerCorrect = false;
+    this.showFeedback = false;
+
+    if (this.currentQuestion.options) {
+      this.selectedOptions = new Array(this.currentQuestion.options.length).fill(false);
+    }
+    this.textAnswer = '';
+
+    this.saveProgress();
+  }
+
   goToQuestion(index: number): void {
+    if (this.isSelectMode) {
+      this.toggleQuestionSelection(index);
+      return;
+    }
     this.currentIndex = index;
     this.initializeAnswer();
   }
@@ -582,7 +700,7 @@ renderLatex(text: string): SafeHtml {
     if (this.currentIndex < this.questions.length - 1) {
       this.currentIndex++;
       this.initializeAnswer();
-    }  
+    }
   }
 
   previousQuestion(): void {
@@ -590,7 +708,7 @@ renderLatex(text: string): SafeHtml {
       this.currentIndex--;
       this.initializeAnswer();
     }
-        console.log("Summary2:");
+    console.log("Summary2:");
     console.log(this.showFeedback);
     console.log(this.isAnswerSubmitted);
     console.log(this.getQuestionStatus(this.currentIndex));
@@ -598,18 +716,18 @@ renderLatex(text: string): SafeHtml {
 
   getQuestionStatus(index: number): string {
     const attempt = this.attempts[index];
-    if (attempt.skipped) return 'unanswered';
+    if (!attempt || attempt.skipped) return 'unanswered';
     if (attempt.correct) return 'correct';
     if (attempt.incorrectPreviousAttempt) return 'incorrectPreviousAttempt';
     return attempt.correct ? 'correct' : 'incorrect';
   }
 
   getQuestionImage(imageIndex: number): string {
-    if (imageIndex==1)
+    if (imageIndex == 1)
       var imageUrl = this.currentQuestion.question_image;
-    if (imageIndex==3)
+    if (imageIndex == 3)
       var imageUrl = this.currentQuestion.answer_image;
-    
+
     if (!imageUrl) {
       return '';
     }
@@ -626,15 +744,15 @@ renderLatex(text: string): SafeHtml {
   isCorrectOption(index: number): boolean {
     const question = this.currentQuestion;
     if (!question.answer) return false;
-    
+
     if (Array.isArray(question.answer)) {
       return question.answer.includes(index + 1);
     }
-    
+
     if (typeof question.answer === 'number') {
       return question.answer === (index + 1);
     }
-    
+
     return false;
   }
 
@@ -658,19 +776,34 @@ renderLatex(text: string): SafeHtml {
     this.finalScore = this.dataService.calculateScore(this.questions, this.attempts);
 
     this.attempts = this.attempts.map(a => ({
-            ...a,
-            incorrectPreviousAttempt: !a.skipped && !a.correct
-          }));
-    
+      ...a,
+      incorrectPreviousAttempt: !a.skipped && !a.correct
+    }));
+
     const incorrectIndices = this.attempts
       .map((a, i) => !a.correct && !a.skipped ? i : -1)
       .filter(i => i !== -1);
-    
+
     console.log('finishTest');
     console.log(incorrectIndices);
     console.log(this.attempts);
 
-    // Save to server instead of localStorage
+
+
+    if (!this.isPractice) {
+      this.saveTestResult();
+    }
+
+    this.showResult = true;
+    this.saveProgress();
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+  }
+
+  saveProgress(): void {
+    if (this.isAIGenerated) return;
+
     const profileName = this.dataService.getProfileName();
     this.dataService.savePracticeAttempts(
       this.domain,
@@ -680,29 +813,19 @@ renderLatex(text: string): SafeHtml {
       this.attempts
     ).subscribe({
       next: () => {
-        console.log('Practice attempts saved successfully to server');
+        console.log('Progress auto-saved to server');
+        localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
       },
       error: (err) => {
-        console.error('Error saving practice attempts to server:', err);
-        // Fallback to localStorage if server save fails
+        console.error('Auto-save to server failed, saving to localStorage', err);
         localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
       }
     });
-    
-
-    if (!this.isPractice) {
-      this.saveTestResult();
-    }
-    
-    this.showResult = true;
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-    }
   }
 
   saveTestResult(): void {
     const testConfigId = this.route.snapshot.queryParams['testConfigId'];
-    
+
     if (testConfigId) {
       this.saveTestAttempt(testConfigId);
     } else {
@@ -715,12 +838,12 @@ renderLatex(text: string): SafeHtml {
       next: (existingAttempts) => {
         const attemptNumber = existingAttempts.length + 1;
         const retestType = this.route.snapshot.queryParams['retestType'];
-        
+
         let attemptType: 'full' | 'retry' | 'incorrect' | 'skipped' = 'full';
         if (retestType === 'incorrect_only') attemptType = 'incorrect';
         else if (retestType === 'skipped_only') attemptType = 'skipped';
         else if (this.parentTestId) attemptType = 'retry';
-        
+
         const attempt = {
           test_config_id: testConfigId,
           attempt_number: attemptNumber,
@@ -760,11 +883,11 @@ renderLatex(text: string): SafeHtml {
 
   saveAsTestInstance(): void {
     let testName = `${this.repository} - ${new Date().toLocaleDateString()}`;
-    
+
     if (this.parentTestId && this.retestType) {
       testName = this.generateRetestName();
     }
-    
+
     const testInstance = {
       test_id: this.dataService.generateTestId(),
       test_name: testName,
@@ -789,7 +912,7 @@ renderLatex(text: string): SafeHtml {
 
   generateRetestName(): string {
     let baseName = `${this.repository}`;
-    
+
     if (this.retestType === 'incorrect_only') {
       baseName += ' - Incorrect Only';
     } else if (this.retestType === 'skipped_only') {
@@ -797,7 +920,7 @@ renderLatex(text: string): SafeHtml {
     } else {
       baseName += ' - Retest';
     }
-    
+
     return baseName;
   }
 
@@ -810,17 +933,17 @@ renderLatex(text: string): SafeHtml {
     const incorrectIndices = this.attempts
       .map((a, i) => !a.correct && !a.skipped ? i : -1)
       .filter(i => i !== -1);
-    
+
     console.log(incorrectIndices);
 
     if (incorrectIndices.length > 0) {
-     
+
       this.dataService.getTestResults(this.dataService.getProfileName()).subscribe({
         next: (tests) => {
           const currentTest = tests[0];
-          
+
           this.router.navigate(['/test', this.domain, this.topic, this.repository], {
-            queryParams: { 
+            queryParams: {
               retestType: 'incorrect_only',
               parentTestId: currentTest?.test_id,
               filterQuestions: 'true'
@@ -836,15 +959,15 @@ renderLatex(text: string): SafeHtml {
     const skippedIndices = this.attempts
       .map((a, i) => a.skipped ? i : -1)
       .filter(i => i !== -1);
-    
-    if (skippedIndices.length > 0) {      
-      
+
+    if (skippedIndices.length > 0) {
+
       this.dataService.getTestResults(this.dataService.getProfileName()).subscribe({
         next: (tests) => {
           const currentTest = tests[0];
-          
+
           this.router.navigate(['/test', this.domain, this.topic, this.repository], {
-            queryParams: { 
+            queryParams: {
               retestType: 'skipped_only',
               parentTestId: currentTest?.test_id,
               filterQuestions: 'true'
@@ -864,13 +987,13 @@ renderLatex(text: string): SafeHtml {
     this.router.navigate(['/results']);
   }
 
-   copyQuestionsToClipboard(): void {
+  copyQuestionsToClipboard(): void {
     if (!this.isAIGenerated || this.aiGeneratedQuestions.length === 0) {
       return;
     }
 
     const jsonString = JSON.stringify(this.aiGeneratedQuestions, null, 2);
-    
+
     navigator.clipboard.writeText(jsonString).then(() => {
       alert('Questions copied to clipboard in JSON format!');
     }).catch(err => {
@@ -879,148 +1002,238 @@ renderLatex(text: string): SafeHtml {
     });
   }
 
-  
-openMoveQuestionDialog(): void {
-  this.showMoveQuestionDialog = true;
-  this.loadAvailableRepositories();
-}
 
-closeMoveQuestionDialog(): void {
-  this.showMoveQuestionDialog = false;
-  this.selectedTargetRepository = '';
-}
-
-loadAvailableRepositories(): void {
-  this.dataService.getRepositoriesForTopic(this.domain, this.topic).subscribe({
-    next: (repositories) => {
-      // Filter out the current repository
-      this.availableRepositories = repositories.filter(repo => repo !== this.repository);
-    },
-    error: (err) => {
-      console.error('Error loading repositories:', err);
-      alert('Failed to load available repositories');
-    }
-  });
-}
-
-moveCurrentQuestion(): void {
-  if (!this.selectedTargetRepository) {
-    alert('Please select a target repository');
-    return;
+  openMoveQuestionDialog(): void {
+    this.showMoveQuestionDialog = true;
+    this.loadAvailableRepositories();
   }
 
-  const confirmMove = confirm(
-    `Are you sure you want to move this question from "${this.repository}" to "${this.selectedTargetRepository}"?\n\n` +
-    `This action cannot be undone and will:\n` +
-    `- Remove the question from the current repository\n` +
-    `- Add it to the target repository\n` +
-    `- Reload the current test`
-  );
-
-  if (!confirmMove) {
-    return;
+  closeMoveQuestionDialog(): void {
+    this.showMoveQuestionDialog = false;
+    this.selectedTargetRepository = '';
   }
 
-  this.isMovingQuestion = true;
-
-  this.dataService.moveQuestion(
-    this.domain,
-    this.topic,
-    this.repository,
-    this.currentIndex,
-    this.selectedTargetRepository
-  ).subscribe({
-    next: () => {
-      //alert(`Question successfully moved to "${this.selectedTargetRepository}"`);
-      this.closeMoveQuestionDialog();
-      
-      // Reload the questions to reflect the change
-      this.reloadQuestions();
-    },
-    error: (err) => {
-      console.error('Error moving question:', err);
-      alert('Failed to move question: ' + (err.error?.message || err.message));
-      this.isMovingQuestion = false;
-    }
-  });
-}
-
-reloadQuestions(): void {
-  this.loading = true;
-  
-  this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
-    next: (questions) => {
-      this.questions = questions;
-      
-      // Adjust current index if it's now out of bounds
-      if (this.currentIndex >= this.questions.length) {
-        this.currentIndex = Math.max(0, this.questions.length - 1);
+  loadAvailableRepositories(): void {
+    this.dataService.getRepositoriesForTopic(this.domain, this.topic).subscribe({
+      next: (repositories) => {
+        // Filter out the current repository
+        this.availableRepositories = repositories.filter(repo => repo !== this.repository);
+      },
+      error: (err) => {
+        console.error('Error loading repositories:', err);
+        alert('Failed to load available repositories');
       }
-      
-      // Reinitialize attempts
-      this.attempts = this.questions.map((_, index) => ({
-        question_index: index,
-        correct: false,
-        skipped: true,
-        incorrectPreviousAttempt: false
-      }));
-      
-      this.loading = false;
-      this.isMovingQuestion = false;
-      this.initializeAnswer();
-    },
-    error: (err) => {
-      console.error('Error reloading questions:', err);
-      alert('Failed to reload questions. Redirecting to home.');
-      this.router.navigate(['/']);
-    }
-  });
-}
-
-// Add these methods to TestComponent class
-
-openDeleteQuestionDialog(): void {
-  this.showDeleteQuestionDialog = true;
-}
-
-closeDeleteQuestionDialog(): void {
-  this.showDeleteQuestionDialog = false;
-}
-
-deleteCurrentQuestion(): void {
-  const confirmDelete = confirm(
-    `Are you sure you want to DELETE this question?\n\n` +
-    `Repository: ${this.repository}\n` +
-    `Question ${this.currentIndex + 1} of ${this.questions.length}\n\n` +
-    `This action CANNOT be undone!\n` +
-    `The question will be permanently removed from the repository.`
-  );
-
-  if (!confirmDelete) {
-    return;
+    });
   }
 
-  this.isDeletingQuestion = true;
-
-  this.dataService.deleteQuestion(
-    this.domain,
-    this.topic,
-    this.repository,
-    this.currentIndex
-  ).subscribe({
-    next: () => {
-      //alert('Question successfully deleted');
-      this.closeDeleteQuestionDialog();
-      
-      // Reload the questions to reflect the change
-      this.reloadQuestions();
-    },
-    error: (err) => {
-      console.error('Error deleting question:', err);
-      alert('Failed to delete question: ' + (err.error?.message || err.message));
-      this.isDeletingQuestion = false;
+  moveSelectedQuestions(): void {
+    if (!this.selectedTargetRepository) {
+      alert('Please select a target repository');
+      return;
     }
-  });
-}
+
+    // Determine which questions to move: either selected ones or the current one
+    const indicesToMove = this.selectedQuestionIndices.size > 0
+      ? Array.from(this.selectedQuestionIndices).sort((a, b) => a - b)
+      : [this.currentIndex];
+
+    const confirmMessage = indicesToMove.length === 1
+      ? `Are you sure you want to move this question to "${this.selectedTargetRepository}"?`
+      : `Are you sure you want to move ${indicesToMove.length} selected questions to "${this.selectedTargetRepository}"?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    this.isMovingQuestion = true;
+
+    this.dataService.moveQuestions(
+      this.domain,
+      this.topic,
+      this.repository,
+      indicesToMove,
+      this.selectedTargetRepository
+    ).subscribe({
+      next: () => {
+        this.closeMoveQuestionDialog();
+        this.selectedQuestionIndices.clear();
+        this.reloadQuestions();
+      },
+      error: (err: any) => {
+        console.error('Error moving questions:', err);
+        alert('Failed to move questions: ' + (err.error?.message || err.message));
+        this.isMovingQuestion = false;
+      }
+    });
+  }
+
+  toggleQuestionSelection(index: number, event?: MouseEvent): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    if (this.selectedQuestionIndices.has(index)) {
+      this.selectedQuestionIndices.delete(index);
+    } else {
+      this.selectedQuestionIndices.add(index);
+    }
+  }
+
+  toggleSelectMode(): void {
+    this.isSelectMode = !this.isSelectMode;
+    if (!this.isSelectMode) {
+      this.selectedQuestionIndices.clear();
+    }
+  }
+
+  selectAllQuestions(): void {
+    if (this.selectedQuestionIndices.size === this.questions.length) {
+      this.selectedQuestionIndices.clear();
+    } else {
+      this.questions.forEach((_, i) => this.selectedQuestionIndices.add(i));
+    }
+  }
+
+  reloadQuestions(): void {
+    this.loading = true;
+
+    this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
+      next: (questions) => {
+        this.questions = questions;
+
+        // Adjust current index if it's now out of bounds
+        if (this.currentIndex >= this.questions.length) {
+          this.currentIndex = Math.max(0, this.questions.length - 1);
+        }
+
+        // Reinitialize attempts by fetching latest from server (to keep markings correct after move/delete)
+        this.dataService.getPracticeAttempts(this.domain, this.topic, this.repository).subscribe({
+          next: (serverAttempts) => {
+            if (serverAttempts && serverAttempts.length > 0) {
+              this.attempts = serverAttempts;
+              // Ensure attempts length matches questions length
+              if (this.attempts.length < this.questions.length) {
+                const paddingCount = this.questions.length - this.attempts.length;
+                for (let i = 0; i < paddingCount; i++) {
+                  const nextIndex = this.attempts.length;
+                  this.attempts.push({
+                    question_index: nextIndex,
+                    correct: false,
+                    skipped: true,
+                    incorrectPreviousAttempt: false
+                  });
+                }
+              }
+            } else {
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false
+              }));
+            }
+            this.loading = false;
+            this.isMovingQuestion = false;
+            this.initializeAnswer();
+          },
+          error: (err) => {
+            console.error('Error loading attempts during reload:', err);
+            // Fallback logic
+            this.attempts = this.questions.map((_, index) => ({
+              question_index: index,
+              correct: false,
+              skipped: true,
+              incorrectPreviousAttempt: false
+            }));
+            this.loading = false;
+            this.isMovingQuestion = false;
+            this.initializeAnswer();
+          }
+        });
+      },
+      error: (err) => {
+        console.error('Error reloading questions:', err);
+        alert('Failed to reload questions. Redirecting to home.');
+        this.router.navigate(['/']);
+      }
+    });
+  }
+
+  // Add these methods to TestComponent class
+
+  openDeleteQuestionDialog(): void {
+    this.showDeleteQuestionDialog = true;
+  }
+
+  closeDeleteQuestionDialog(): void {
+    this.showDeleteQuestionDialog = false;
+  }
+
+  deleteCurrentQuestion(): void {
+    const confirmDelete = confirm(
+      `Are you sure you want to DELETE this question?\n\n` +
+      `Repository: ${this.repository}\n` +
+      `Question ${this.currentIndex + 1} of ${this.questions.length}\n\n` +
+      `This action CANNOT be undone!\n` +
+      `The question will be permanently removed from the repository.`
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    this.isDeletingQuestion = true;
+
+    this.dataService.deleteQuestion(
+      this.domain,
+      this.topic,
+      this.repository,
+      this.currentIndex
+    ).subscribe({
+      next: () => {
+        //alert('Question successfully deleted');
+        this.closeDeleteQuestionDialog();
+
+        // Reload the questions to reflect the change
+        this.reloadQuestions();
+      },
+      error: (err) => {
+        console.error('Error deleting question:', err);
+        alert('Failed to delete question: ' + (err.error?.message || err.message));
+        this.isDeletingQuestion = false;
+      }
+    });
+  }
+
+  clearProgress(): void {
+    if (confirm('Are you sure you want to clear all progress for this lesson? This will reset all markings and timings.')) {
+      this.dataService.deletePracticeAttempts(
+        this.domain,
+        this.topic,
+        this.repository
+      ).subscribe({
+        next: () => {
+          // Clear local storage too
+          const cacheKey = `${this.topic}_${this.repository}`;
+          localStorage.removeItem(cacheKey);
+
+          // Reset local state
+          this.attempts = this.questions.map((_, index) => ({
+            question_index: index,
+            correct: false,
+            skipped: true,
+            incorrectPreviousAttempt: false
+          }));
+
+          this.lastQuestionTime = '00:00';
+          this.initializeAnswer();
+          // alert('Progress cleared successfully');
+        },
+        error: (err) => {
+          console.error('Error clearing progress:', err);
+          alert('Failed to clear progress on server.');
+        }
+      });
+    }
+  }
 
 }

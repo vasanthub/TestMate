@@ -202,10 +202,12 @@ mark {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.domains {  
+.domains {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -363,35 +365,139 @@ mark {
   }
 }
 
-.repo-container {
-  position: relative;
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+
+  th {
+    background-color: #f1f5f9;
+    color: #475569;
+    font-weight: 700;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    color: #334155;
+  }
+
+  tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-primary-colored {
+    color: #2563eb;
+    font-weight: 500;
+  }
+
+  .text-success-colored {
+    color: #16a34a;
+    font-weight: 500;
+  }
+
+  .text-danger-colored {
+    color: #dc2626;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .score-colored {
+    color: #7c3aed;
+    font-weight: 600;
+  }
+
+  .high-score {
+    color: #059669;
+  }
+
+  .low-score {
+    color: #dc2626;
+  }
 }
 
-.repo-link {
+.repo-cell-content {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  background-color: var(--surface);
-  border-radius: 0.25rem;
-  text-decoration: none;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
-  font-size: 0.8rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
 
   &:hover {
-    border-color: var(--primary-color);
-    background-color: var(--primary-light);
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
-    .repo-icon {
-      color: white;
+    .clear-progress-btn {
+      opacity: 1;
+      visibility: visible;
     }
   }
 }
+
+.repo-link-table {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: #1e293b;
+  font-weight: 500;
+  cursor: pointer;
+  flex: 1;
+
+  &:hover {
+    color: var(--primary-color);
+
+    .repo-icon {
+      color: var(--primary-color);
+    }
+  }
+}
+
+.clear-progress-btn {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+  opacity: 0;
+  visibility: hidden;
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  &:hover {
+    color: #ef4444;
+    background-color: #fee2e2;
+  }
+}
+
 
 .repo-icon {
   width: 0.875rem;
@@ -478,7 +584,7 @@ mark {
 
   &.not-started {
     color: #666;
-    
+
     &:hover {
       background-color: #e0e0e0;
       color: #333;
@@ -487,7 +593,7 @@ mark {
 
   &.started {
     color: #856404;
-    
+
     &:hover {
       background-color: #fff3cd;
       color: #664d03;
@@ -496,7 +602,7 @@ mark {
 
   &.completed {
     color: #155724;
-    
+
     &:hover {
       background-color: #d4edda;
       color: #0f4419;
@@ -628,7 +734,7 @@ mark {
 
   .status-filter {
     width: 100%;
-    
+
     .status-select {
       width: 100%;
     }

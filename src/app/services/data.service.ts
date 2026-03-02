@@ -8,8 +8,8 @@ import { Question, TestInstance, Repository, DomainStructure } from '../models/q
   providedIn: 'root'
 })
 export class DataService {
-  //private apiUrl = 'https://localhost:7221/api';
-  private apiUrl = 'http://icherish.in/api3/api';
+  private apiUrl = 'https://localhost:7221/api';
+  //private apiUrl = 'http://icherish.in/api3/api';
   private profileName$ = new BehaviorSubject<string>('Jade');
 
   constructor(private http: HttpClient) {
@@ -18,6 +18,10 @@ export class DataService {
     if (profile) {
       this.profileName$.next(profile);
     }
+  }
+
+  getApiUrl(): string {
+    return this.apiUrl;
   }
 
   saveTestAttempt(attempt: any): Observable<any> {
@@ -169,6 +173,11 @@ export class DataService {
   }
 
   // Add these methods to your existing DataService
+
+  getRepositorySummaries(profileName?: string): Observable<{ [key: string]: any }> {
+    const profile = profileName || this.getProfileName();
+    return this.http.get<{ [key: string]: any }>(`${this.apiUrl}/repository-summaries?profileName=${profile}`);
+  }
 
   getRepositoryStatuses(profileName: string = 'default'): Observable<{ [key: string]: string }> {
     return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/repository-status?profileName=${profileName}`);

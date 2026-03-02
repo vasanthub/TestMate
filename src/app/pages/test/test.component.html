@@ -6,7 +6,7 @@
     <span class="separator">/</span>
     <a routerLink="/" [queryParams]="{ domain: domain, topic: topic }">{{ topic }}</a>
     <span class="separator">/</span>
-    <a [routerLink]="['/repository', domain, topic, repository]" class="current">{{ repository }}</a>
+    <span class="current">{{ repository }}</span>
   </div>
   <div *ngIf="!showResult" class="test-layout">
     <!-- Main Question Area -->
@@ -54,9 +54,6 @@
             {{ showStats ? '📊' : '📈' }}
           </button>
 
-          <button class="btn-icon btn-icon-warning" (click)="clearProgress()" title="Clear Lesson Progress">
-            🔄
-          </button>
         </div>
         <div class="progress-bar">
           <div class="progress-fill" [style.width.%]="(currentIndex + 1) / questions.length * 100"></div>
@@ -244,7 +241,8 @@
             [class.selected-move]="selectedQuestionIndices.has(i)" (click)="goToQuestion(i)"
             (contextmenu)="toggleQuestionSelection(i, $event)">
             <div class="question-number-text">{{ i + 1 }}</div>
-            <div *ngIf="showStats && attempts[i]?.time_taken" class="question-time-small">{{ attempts[i].time_taken }}
+            <div *ngIf="showStats && attempts[i]?.time_taken" class="question-time-small">{{
+              formatTimeDisplay(attempts[i].time_taken) }}
             </div>
             <div *ngIf="selectedQuestionIndices.has(i)" class="selection-marker">✓</div>
           </button>
@@ -275,6 +273,10 @@
         <div class="stat-item vertical">
           <span class="stat-label">Total</span>
           <span class="stat-value">📋 {{ questions.length }}</span>
+        </div>
+        <div class="stat-item vertical">
+          <span class="stat-label">Attempted</span>
+          <span class="stat-value">📝 {{ answeredCount }}</span>
         </div>
         <div class="stat-item vertical">
           <span class="stat-label">Correct</span>
@@ -322,26 +324,38 @@
 
     <div class="score-display">
       <div class="score-circle">
-        <span class="score-number">{{ finalScore }}%</span>
+        <span class="score-number">{{ correctPercent | number:'1.0-0' }}%</span>
       </div>
     </div>
 
     <div class="result-stats">
       <div class="result-stat">
-        <span class="result-stat-value">{{ answeredCount }}</span>
-        <span class="result-stat-label">Answered</span>
+        <span class="result-stat-value">📋 {{ questions.length }}</span>
+        <span class="result-stat-label">Total</span>
       </div>
       <div class="result-stat">
-        <span class="result-stat-value">{{ correctCount }}</span>
+        <span class="result-stat-value">📝 {{ answeredCount }}</span>
+        <span class="result-stat-label">Attempted</span>
+      </div>
+      <div class="result-stat">
+        <span class="result-stat-value">✅ {{ correctCount }}</span>
         <span class="result-stat-label">Correct</span>
       </div>
       <div class="result-stat">
-        <span class="result-stat-value">{{ incorrectCount }}</span>
+        <span class="result-stat-value">❌ {{ incorrectCount }}</span>
         <span class="result-stat-label">Incorrect</span>
       </div>
       <div class="result-stat">
-        <span class="result-stat-value">{{ skippedCount }}</span>
+        <span class="result-stat-value">⚡ {{ averageTime }}</span>
+        <span class="result-stat-label">Avg Time</span>
+      </div>
+      <div class="result-stat" *ngIf="skippedCount > 0">
+        <span class="result-stat-value">⏭️ {{ skippedCount }}</span>
         <span class="result-stat-label">Skipped</span>
+      </div>
+      <div class="result-stat">
+        <span class="result-stat-value">⏳ {{ elapsedTime }}</span>
+        <span class="result-stat-label">Session</span>
       </div>
     </div>
 

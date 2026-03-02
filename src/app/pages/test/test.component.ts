@@ -55,6 +55,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   mode: 'practice' | 'test' = 'practice';
   userAnswers: (number[] | string)[] = [];
 
+  practiceIncorrectOnly: boolean = false;
+
   hideAnswer: boolean = true;
 
   // Move / Delete properties
@@ -104,6 +106,10 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.topic = params['topic'];
       this.repository = params['repository'];
 
+      localStorage.setItem("selectedDomain", this.domain);
+      localStorage.setItem("selectedTopic", this.topic);
+      localStorage.setItem("selectedrepository", this.repository);
+
       console.log(this.repository);
     });
 
@@ -117,10 +123,14 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.parentTestId = params['parentTestId'];
       this.retestType = params['retestType'];
 
+
+      this.practiceIncorrectOnly = params['practiceIncorrectOnly'] === 'true';
+
       this.hideAnswer = params['hideAnswer'] === 'true';
       console.log("start: ", start);
       console.log("end: ", end);
       console.log("hideAnswer: ", this.hideAnswer);
+      console.log("practiceIncorrectOnly: ", this.practiceIncorrectOnly);
 
       if (this.isAIGenerated) {
         this.loadAIQuestions();
@@ -338,7 +348,24 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
             console.log("serverAttempts loaded");
             console.log(serverAttempts);
 
-            if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
+            if (this.practiceIncorrectOnly && serverAttempts && serverAttempts.length > 0) {
+              const incorrectIndices = serverAttempts
+                .filter(a => !a.skipped && !a.correct)
+                .map(a => a.question_index);
+
+              this.questions = incorrectIndices.map(i => questions[i]).filter(q => q !== undefined);
+
+              // Create FRESH attempts for this session (temporary, not saved)
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false,
+                answered: undefined,
+                time_taken: undefined
+              }));
+            }
+            else if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
               const indices: number[] = serverAttempts.map(a => a.question_index);
               this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);
             }
@@ -349,34 +376,34 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
               this.questions = questions;
             }
 
-            if (serverAttempts && serverAttempts.length > 0) {
-              this.attempts = serverAttempts;
-              // Ensure attempts length matches questions length (e.g. after moving/adding questions)
-              if (this.attempts.length < this.questions.length) {
-                const paddingCount = this.questions.length - this.attempts.length;
-                for (let i = 0; i < paddingCount; i++) {
-                  const nextIndex = this.attempts.length;
-                  this.attempts.push({
-                    question_index: nextIndex,
+            if (!this.practiceIncorrectOnly) {
+              if (serverAttempts && serverAttempts.length > 0) {
+                this.attempts = serverAttempts;
+                if (this.attempts.length < this.questions.length) {
+                  const paddingCount = this.questions.length - this.attempts.length;
+                  for (let i = 0; i < paddingCount; i++) {
+                    const nextIndex = this.attempts.length;
+                    this.attempts.push({
+                      question_index: nextIndex,
+                      correct: false,
+                      skipped: true,
+                      incorrectPreviousAttempt: false
+                    });
+                  }
+                }
+              } else {
+                const localData = localStorage.getItem(this.topic + '_' + this.repository);
+                if (localData) {
+                  this.attempts = JSON.parse(localData);
+                  console.log('Loaded attempts from localStorage');
+                } else {
+                  this.attempts = this.questions.map((_, index) => ({
+                    question_index: index,
                     correct: false,
                     skipped: true,
                     incorrectPreviousAttempt: false
-                  });
+                  }));
                 }
-              }
-            }
-            else {
-              const localData = localStorage.getItem(this.topic + '_' + this.repository);
-              if (localData) {
-                this.attempts = JSON.parse(localData);
-                console.log('Loaded attempts from localStorage');
-              } else {
-                this.attempts = this.questions.map((_, index) => ({
-                  question_index: index,
-                  correct: false,
-                  skipped: true,
-                  incorrectPreviousAttempt: false
-                }));
               }
             }
 
@@ -491,6 +518,23 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     const mins = Math.floor(avgSeconds / 60);
     const secs = avgSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  formatTimeDisplay(timeStr: string | undefined): string {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return timeStr;
+
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseInt(parts[1], 10);
+
+    if (isNaN(minutes) || isNaN(seconds)) return timeStr;
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
   }
 
   initializeAnswer(): void {
@@ -802,7 +846,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveProgress(): void {
-    if (this.isAIGenerated) return;
+    if (this.isAIGenerated || this.practiceIncorrectOnly) return;
 
     const profileName = this.dataService.getProfileName();
     this.dataService.savePracticeAttempts(
@@ -882,6 +926,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveAsTestInstance(): void {
+    if (this.practiceIncorrectOnly) return;
     let testName = `${this.repository} - ${new Date().toLocaleDateString()}`;
 
     if (this.parentTestId && this.retestType) {
@@ -1202,38 +1247,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isDeletingQuestion = false;
       }
     });
-  }
-
-  clearProgress(): void {
-    if (confirm('Are you sure you want to clear all progress for this lesson? This will reset all markings and timings.')) {
-      this.dataService.deletePracticeAttempts(
-        this.domain,
-        this.topic,
-        this.repository
-      ).subscribe({
-        next: () => {
-          // Clear local storage too
-          const cacheKey = `${this.topic}_${this.repository}`;
-          localStorage.removeItem(cacheKey);
-
-          // Reset local state
-          this.attempts = this.questions.map((_, index) => ({
-            question_index: index,
-            correct: false,
-            skipped: true,
-            incorrectPreviousAttempt: false
-          }));
-
-          this.lastQuestionTime = '00:00';
-          this.initializeAnswer();
-          // alert('Progress cleared successfully');
-        },
-        error: (err) => {
-          console.error('Error clearing progress:', err);
-          alert('Failed to clear progress on server.');
-        }
-      });
-    }
   }
 
 }

@@ -24,10 +24,12 @@ export class RepositoryComponent implements OnInit {
   rangeEnd: number = 0;
   useRange: boolean = true;
   clearPreviousAttempts: boolean = false;
+  practiceIncorrectOnly: boolean = false;
   testName: string = '';
 
   savedTests: TestConfiguration[] = [];
   testAttempts: { [testId: string]: TestAttempt[] } = {};
+  testStats: { [testId: string]: any } = {};
 
   expandedSections: { [key: string]: boolean } = {
     'header': true,
@@ -109,6 +111,7 @@ export class RepositoryComponent implements OnInit {
     this.dataService.getTestAttempts(testId).subscribe({
       next: (attempts) => {
         this.testAttempts[testId] = attempts;
+        this.calculateTestStats(testId, attempts);
         this.loadingAttempts[testId] = false;
       },
       error: (err) => {
@@ -116,6 +119,31 @@ export class RepositoryComponent implements OnInit {
         this.loadingAttempts[testId] = false;
       }
     });
+  }
+
+  calculateTestStats(testId: string, attempts: TestAttempt[]): void {
+    if (!attempts || attempts.length === 0) return;
+
+    // Use latest attempt for stats
+    const latest = attempts[attempts.length - 1];
+
+    const correct = latest.questions_attempted.filter(q => q.correct).length;
+    const attempted = latest.questions_attempted.filter(q => !q.skipped).length;
+    const total = latest.total_questions;
+    const score = latest.score;
+
+    this.testStats[testId] = {
+      total,
+      attempted,
+      correct,
+      incorrect: attempted - correct,
+      score,
+      avgTime: latest.time_taken || '00:00'
+    };
+  }
+
+  getTestStats(testId: string): any {
+    return this.testStats[testId];
   }
 
   getAttempts(testId: string | undefined): TestAttempt[] {
@@ -276,6 +304,9 @@ export class RepositoryComponent implements OnInit {
       queryParams.start = this.rangeStart;
       queryParams.end = this.rangeEnd;
       queryParams.hideAnswer = this.hideAnswer;
+    }
+    if (this.practiceIncorrectOnly) {
+      queryParams.practiceIncorrectOnly = 'true';
     }
     this.router.navigate(['/practice', this.domain, this.topic, this.repository], { queryParams });
   }

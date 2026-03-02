@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
@@ -22,25 +23,29 @@ export class HomeComponent implements OnInit {
 
   expandedDomains: { [key: string]: boolean } = {};
   expandedTopics: { [key: string]: boolean } = {};
-  
+
   searchQuery: string = '';
   filteredDomains: string[] = [];
   filteredTopics: { [domain: string]: string[] } = {};
   filteredRepos: { [key: string]: string[] } = {};
 
   repositoryStatuses: { [key: string]: string } = {};
+  repositorySummaries: { [key: string]: any } = {};
   statusFilter: string = 'all';
   openStatusMenu: string | null = null;
 
   profileName: string = "default";
 
   constructor(private route: ActivatedRoute,
-    private router: Router, private dataService: DataService) {}
+    private router: Router,
+    private dataService: DataService,
+    private http: HttpClient) { }
 
   ngOnInit(): void {
     this.profileName = this.dataService.getProfileName();
     this.loadStructure();
     this.loadRepositoryStatuses();
+    this.loadRepositorySummaries();
 
     // Expand sections based on query params (from breadcrumbs)
     this.route.queryParams.subscribe(params => {
@@ -80,15 +85,81 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  loadRepositorySummaries(): void {
+    this.dataService.getRepositorySummaries(this.profileName).subscribe({
+      next: (summaries) => {
+        this.repositorySummaries = summaries;
+      },
+      error: (err) => {
+        console.error('Error loading repository summaries:', err);
+      }
+    });
+  }
+
+
+  practiceIncorrect(domain: string, topic: string, repo: string): void {
+    this.router.navigate(['/practice', domain, topic, repo], {
+      queryParams: { practiceIncorrectOnly: 'true' }
+    });
+  }
+
+  navigateToPractice(domain: string, topic: string, repo: string): void {
+    this.router.navigate(['/practice', domain, topic, repo]);
+  }
+
+  clearProgress(domain: string, topic: string, repo: string, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (confirm(`Clear all practice progress for "${repo}"?`)) {
+      this.dataService.deletePracticeAttempts(domain, topic, repo, this.profileName).subscribe({
+        next: () => {
+          // Clear local cache if exists
+          const cacheKey = `${topic}_${repo}`;
+          localStorage.removeItem(cacheKey);
+
+          // Reload summaries to update UI
+          this.loadRepositorySummaries();
+        },
+        error: (err) => {
+          console.error('Error clearing progress:', err);
+          alert('Failed to clear progress. Please try again.');
+        }
+      });
+    }
+  }
+
   getRepositoryStatus(domain: string, topic: string, repository: string): string {
     const key = `${domain}|${topic}|${repository}`;
     return this.repositoryStatuses[key] || 'not_started';
   }
 
+  getRepositorySummary(domain: string, topic: string, repository: string): any {
+    const key = `${domain}|${topic}|${repository}`;
+    let summary = this.repositorySummaries[key];
+
+    if (!summary) {
+      // Case-insensitive fallback
+      const lowerKey = key.toLowerCase();
+      const foundKey = Object.keys(this.repositorySummaries).find(k => k.toLowerCase() === lowerKey);
+      if (foundKey) summary = this.repositorySummaries[foundKey];
+    }
+
+    if (summary) {
+      // Hide 00:00 or if not attempted
+      if (summary.avgTime === '00:00' || summary.attempted === 0) {
+        summary.avgTime = '';
+      }
+      return summary;
+    }
+
+    return null;
+  }
+
   updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    
+
     this.dataService.updateRepositoryStatus(domain, topic, repository, status, this.profileName).subscribe({
       next: () => {
         const key = `${domain}|${topic}|${repository}`;
@@ -104,7 +175,7 @@ export class HomeComponent implements OnInit {
   toggleStatusMenu(domain: string, topic: string, repository: string, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const key = `${domain}|${topic}|${repository}`;
     if (this.openStatusMenu === key) {
       this.openStatusMenu = null;
@@ -156,7 +227,7 @@ export class HomeComponent implements OnInit {
 
   onSearch(): void {
     const query = this.searchQuery.toLowerCase().trim();
-    
+
     if (!query) {
       this.applyFilters();
       return;
@@ -173,7 +244,7 @@ export class HomeComponent implements OnInit {
 
       topics.forEach(topic => {
         const repos = this.getRepositories(domain, topic);
-        const matchingRepos = repos.filter(repo => 
+        const matchingRepos = repos.filter(repo =>
           repo.toLowerCase().includes(query)
         );
 
@@ -183,7 +254,7 @@ export class HomeComponent implements OnInit {
           matchingTopics.push(topic);
           const key = `${domain}-${topic}`;
           this.filteredRepos[key] = matchingRepos.length > 0 ? matchingRepos : repos;
-          
+
           if (query) {
             this.expandedDomains[domain] = true;
             this.expandedTopics[key] = true;
@@ -211,7 +282,7 @@ export class HomeComponent implements OnInit {
 
   applyFilters(): void {
     const query = this.searchQuery.toLowerCase().trim();
-    
+
     this.filteredDomains = [];
     this.filteredTopics = {};
     this.filteredRepos = {};
@@ -226,25 +297,25 @@ export class HomeComponent implements OnInit {
         let matchingRepos = repos;
 
         if (query) {
-          matchingRepos = repos.filter(repo => 
+          matchingRepos = repos.filter(repo =>
             repo.toLowerCase().includes(query)
           );
         }
 
         if (this.statusFilter !== 'all') {
-          matchingRepos = matchingRepos.filter(repo => 
+          matchingRepos = matchingRepos.filter(repo =>
             this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
           );
         }
 
         const topicMatches = !query || topic.toLowerCase().includes(query);
 
-        if ((topicMatches || matchingRepos.length > 0 || domainMatches) && 
-            (this.statusFilter === 'all' || matchingRepos.length > 0)) {
+        if ((topicMatches || matchingRepos.length > 0 || domainMatches) &&
+          (this.statusFilter === 'all' || matchingRepos.length > 0)) {
           matchingTopics.push(topic);
           const key = `${domain}-${topic}`;
           this.filteredRepos[key] = matchingRepos;
-          
+
           if (query || this.statusFilter !== 'all') {
             this.expandedDomains[domain] = true;
             this.expandedTopics[key] = true;
@@ -252,8 +323,8 @@ export class HomeComponent implements OnInit {
         }
       });
 
-      if ((domainMatches || matchingTopics.length > 0) && 
-          (this.statusFilter === 'all' || matchingTopics.length > 0)) {
+      if ((domainMatches || matchingTopics.length > 0) &&
+        (this.statusFilter === 'all' || matchingTopics.length > 0)) {
         this.filteredDomains.push(domain);
         this.filteredTopics[domain] = matchingTopics;
       }
@@ -274,7 +345,7 @@ export class HomeComponent implements OnInit {
       topics.forEach(topic => {
         const key = `${domain}-${topic}`;
         const repos = this.filteredRepos[key] || this.getRepositories(domain, topic);
-        const matchingRepos = repos.filter(repo => 
+        const matchingRepos = repos.filter(repo =>
           this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
         );
 
@@ -316,7 +387,7 @@ export class HomeComponent implements OnInit {
 
   highlightMatch(text: string): string {
     if (!this.searchQuery) return text;
-    
+
     const query = this.searchQuery.trim();
     const regex = new RegExp(`(${query})`, 'gi');
     return text.replace(regex, '<mark>$1</mark>');
@@ -351,9 +422,7 @@ export class HomeComponent implements OnInit {
           isAIGenerated: true
         };
         console.log(testData);
-        console.log('calling test component...');
-        
-        this.router.navigate(['/practice', 'this.domain', 'this.topic', 'this.repository'], { state: { testData }  });
+        this.router.navigate(['/practice', testData.domain, testData.topic, testData.repository], { state: { testData } });
 
       },
       error: (error) => {
@@ -367,5 +436,5 @@ export class HomeComponent implements OnInit {
   copyToClipboard(): void {
     alert('Copy to clipboard feature - to be implemented after test generation');
   }
-  
+
 }

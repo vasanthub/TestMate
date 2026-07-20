@@ -279,6 +279,10 @@
           <span class="stat-value">📝 {{ answeredCount }}</span>
         </div>
         <div class="stat-item vertical">
+          <span class="stat-label">Progress</span>
+          <span class="stat-value">📈 {{ (answeredCount * 100 / questions.length | number:'1.0-0') }}%</span>
+        </div>
+        <div class="stat-item vertical">
           <span class="stat-label">Correct</span>
           <span class="stat-value">✅ {{ correctCount }}</span>
         </div>
@@ -303,85 +307,76 @@
 
     </div>
   </div>
-</div>
 
-<!-- Result Screen -->
-<div *ngIf="showResult" class="result-screen">
-  <div class="result-card card">
-    <div class="result-icon">
-      <svg *ngIf="finalScore >= 70" class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round" />
-      </svg>
-      <svg *ngIf="finalScore < 70" class="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path
-          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </div>
+  <!-- Result Screen -->
+  <div *ngIf="showResult" class="result-screen">
+    <div class="result-card card">
+      <div class="result-icon">
+        <svg *ngIf="finalScore >= 70" class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+        <svg *ngIf="finalScore < 70" class="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
 
-    <h1 class="result-title">{{ isPractice ? 'Practice' : 'Test' }} Complete!</h1>
+      <h1 class="result-title">{{ isPractice ? 'Practice' : 'Test' }} Complete!</h1>
 
-    <div class="score-display">
-      <div class="score-circle">
-        <span class="score-number">{{ correctPercent | number:'1.0-0' }}%</span>
+      <div class="score-display">
+        <div class="score-circle">
+          <span class="score-number">{{ correctPercent | number:'1.0-0' }}%</span>
+        </div>
       </div>
-    </div>
 
-    <div class="result-stats">
-      <div class="result-stat">
-        <span class="result-stat-value">📋 {{ questions.length }}</span>
-        <span class="result-stat-label">Total</span>
+      <div class="result-stats">
+        <div class="result-stat">
+          <span class="result-stat-value">📋 {{ questions.length }}</span>
+          <span class="result-stat-label">Total</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">📝 {{ answeredCount }}</span>
+          <span class="result-stat-label">Attempted</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">📈 {{ (answeredCount * 100 / questions.length | number:'1.0-0') }}%</span>
+          <span class="result-stat-label">Progress</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">✅ {{ correctCount }}</span>
+          <span class="result-stat-label">Correct</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">❌ {{ incorrectCount }}</span>
+          <span class="result-stat-label">Incorrect</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">⚡ {{ averageTime }}</span>
+          <span class="result-stat-label">Avg Time</span>
+        </div>
+        <div class="result-stat" *ngIf="skippedCount > 0">
+          <span class="result-stat-value">⏭️ {{ skippedCount }}</span>
+          <span class="result-stat-label">Skipped</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat-value">⏳ {{ elapsedTime }}</span>
+          <span class="result-stat-label">Session</span>
+        </div>
       </div>
-      <div class="result-stat">
-        <span class="result-stat-value">📝 {{ answeredCount }}</span>
-        <span class="result-stat-label">Attempted</span>
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">✅ {{ correctCount }}</span>
-        <span class="result-stat-label">Correct</span>
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">❌ {{ incorrectCount }}</span>
-        <span class="result-stat-label">Incorrect</span>
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">⚡ {{ averageTime }}</span>
-        <span class="result-stat-label">Avg Time</span>
-      </div>
-      <div class="result-stat" *ngIf="skippedCount > 0">
-        <span class="result-stat-value">⏭️ {{ skippedCount }}</span>
-        <span class="result-stat-label">Skipped</span>
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">⏳ {{ elapsedTime }}</span>
-        <span class="result-stat-label">Session</span>
-      </div>
-    </div>
 
-    <div class="result-actions">
-      <!-- <button class="btn btn-primary" (click)="retakeFull()">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="result-actions">
+        <button class="btn btn-primary" (click)="goToList()">
+          <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          Retake Full Test
+          Back to List
         </button>
-        <button *ngIf="incorrectCount > 0" 
-                class="btn btn-warning" 
-                (click)="retakeIncorrect()">
-          Retry Incorrect
+        <button class="btn btn-secondary" (click)="goHome()">
+          Back to Home
         </button>
-        <button *ngIf="skippedCount > 0" 
-                class="btn btn-secondary" 
-                (click)="retakeSkipped()">
-          Retry Skipped
-        </button>
-        <button *ngIf="!isPractice" class="btn btn-secondary" (click)="viewResults()">
-          View All Results
-        </button> -->
-      <button class="btn btn-secondary" (click)="goHome()">
-        Back to Home
-      </button>
+      </div>
     </div>
   </div>
 </div>

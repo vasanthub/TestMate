@@ -76,6 +76,7 @@
                       <th>Repository</th>
                       <th class="text-center">Questions</th>
                       <th class="text-center">Attempted</th>
+                      <th class="text-center">%</th>
                       <th class="text-center">Correct</th>
                       <th class="text-center">Incorrect</th>
                       <th class="text-right">Avg. Time</th>
@@ -107,12 +108,17 @@
                       <ng-container *ngIf="getRepositorySummary(domain, topic, repo) as summary; else noStats">
                         <td class="text-center text-primary-colored">{{ summary.totalQuestions }}</td>
                         <td class="text-center">
-                          <ng-container *ngIf="summary.attempted > 0">
-                            {{ summary.attempted }}
-                            <span [class.text-success-colored]="summary.attempted === summary.totalQuestions">
-                              ({{ (summary.attempted * 100 / summary.totalQuestions | number:'1.0-0') }}%)
-                            </span>
-                          </ng-container>
+                          {{ summary.attempted || '' }}
+                        </td>
+                        <td class="text-center">
+                          <div class="progress-cell" *ngIf="summary.attempted > 0">
+                            <div class="mini-bar">
+                              <div class="mini-bar-fill"
+                                [class.completed]="summary.attempted === summary.totalQuestions"
+                                [style.width.%]="(summary.attempted * 100 / summary.totalQuestions)"></div>
+                            </div>
+                            {{ (summary.attempted * 100 / summary.totalQuestions | number:'1.0-0') }}%
+                          </div>
                         </td>
                         <td class="text-center text-success-colored">{{ summary.correct || '' }}</td>
                         <td class="text-center">
@@ -122,14 +128,21 @@
                           </a>
                           <span *ngIf="summary.incorrect === 0 && summary.attempted > 0">{{ summary.incorrect }}</span>
                         </td>
-                        <td class="text-right">{{ summary.avgTime || '' }}</td>
+                        <td class="text-right">
+                          <span class="avg-time-val">{{ summary.formattedAvgTime || '' }}</span>
+                          <span *ngIf="summary.timeToComplete" class="time-to-complete"
+                            title="Estimated time to complete remaining questions">
+                            ({{ summary.timeToComplete }} left)
+                          </span>
+                        </td>
                         <td class="text-right score-colored" [class.high-score]="summary.score >= 80"
                           [class.low-score]="summary.score < 50">
                           {{ summary.attempted > 0 ? summary.score + '%' : '' }}
                         </td>
                       </ng-container>
                       <ng-template #noStats>
-                        <td class="text-center">-</td>
+                        <td class="text-center"></td>
+                        <td class="text-center"></td>
                         <td class="text-center"></td>
                         <td class="text-center"></td>
                         <td class="text-center"></td>

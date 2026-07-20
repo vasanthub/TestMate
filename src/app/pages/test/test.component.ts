@@ -6,6 +6,7 @@ import { DataService } from '../../services/data.service';
 import { LatexService } from '../../services/latex.service';
 import { Question, QuestionAttempt, TestInstance } from '../../models/question.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-test',
@@ -782,7 +783,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // Prefix with the base URL if it's not a complete URL
-    return `http://icherish.in/files/images/testmate/${imageUrl}`;
+    return `${environment.imageUrlBase}${imageUrl}`;
   }
 
   isCorrectOption(index: number): boolean {
@@ -840,6 +841,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.showResult = true;
     this.saveProgress();
+    window.scrollTo(0, 0);
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
@@ -1026,6 +1028,10 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
   goHome(): void {
     this.router.navigate(['/']);
+  }
+
+  goToList(): void {
+    this.router.navigate(['/'], { queryParams: { domain: this.domain, topic: this.topic } });
   }
 
   viewResults(): void {

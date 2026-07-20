@@ -3,13 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Question, TestInstance, Repository, DomainStructure } from '../models/question.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
-  private apiUrl = 'https://localhost:7221/api';
-  //private apiUrl = 'http://icherish.in/api3/api';
+  private apiUrl = environment.apiUrl;
   private profileName$ = new BehaviorSubject<string>('Jade');
 
   constructor(private http: HttpClient) {

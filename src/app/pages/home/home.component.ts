@@ -88,6 +88,47 @@ export class HomeComponent implements OnInit {
   loadRepositorySummaries(): void {
     this.dataService.getRepositorySummaries(this.profileName).subscribe({
       next: (summaries) => {
+        // Pre-process summaries to calculate timeToComplete and format avgTime
+        Object.keys(summaries).forEach(key => {
+          const summary = summaries[key];
+          if (summary && summary.avgTime && summary.avgTime !== '00:00' && summary.attempted > 0) {
+            // Parse avgTime (expected format mm:ss or m s)
+            let avgSeconds = 0;
+            const hhmmssMatch = summary.avgTime.match(/^(\d{1,2}):(\d{2})$/);
+            if (hhmmssMatch) {
+              const m = parseInt(hhmmssMatch[1], 10);
+              const s = parseInt(hhmmssMatch[2], 10);
+              avgSeconds = m * 60 + s;
+              summary.formattedAvgTime = m > 0 ? `${m}m ${s}s` : `${s}s`;
+            } else {
+              const mMatch = summary.avgTime.match(/(\d+)m/);
+              const sMatch = summary.avgTime.match(/(\d+)s/);
+              if (mMatch) avgSeconds += parseInt(mMatch[1], 10) * 60;
+              if (sMatch) avgSeconds += parseInt(sMatch[1], 10);
+              summary.formattedAvgTime = summary.avgTime;
+            }
+
+            // Calculate time to complete
+            if (summary.attempted < summary.totalQuestions && avgSeconds > 0) {
+              const remaining = summary.totalQuestions - summary.attempted;
+              const totalRemainingSeconds = remaining * avgSeconds;
+
+              const h = Math.floor(totalRemainingSeconds / 3600);
+              const m = Math.floor((totalRemainingSeconds % 3600) / 60);
+              const s = totalRemainingSeconds % 60;
+
+              let timeParts = [];
+              if (h > 0) {
+                timeParts.push(`${h}h`);
+                if (m > 0) timeParts.push(`${m}m`);
+              } else {
+                if (m > 0) timeParts.push(`${m}m`);
+                if (s > 0) timeParts.push(`${s}s`);
+              }
+              summary.timeToComplete = timeParts.join(' ');
+            }
+          }
+        });
         this.repositorySummaries = summaries;
       },
       error: (err) => {
@@ -145,15 +186,7 @@ export class HomeComponent implements OnInit {
       if (foundKey) summary = this.repositorySummaries[foundKey];
     }
 
-    if (summary) {
-      // Hide 00:00 or if not attempted
-      if (summary.avgTime === '00:00' || summary.attempted === 0) {
-        summary.avgTime = '';
-      }
-      return summary;
-    }
-
-    return null;
+    return summary || null;
   }
 
   updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, event: Event): void {

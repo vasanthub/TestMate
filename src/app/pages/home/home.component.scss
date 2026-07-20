@@ -425,6 +425,21 @@ mark {
     cursor: pointer;
   }
 
+  .avg-time-val {
+    font-weight: 500;
+  }
+
+
+  .time-to-complete {
+    font-size: 0.725rem;
+    color: #475569;
+    font-weight: 500;
+    margin-left: 0.4rem;
+    font-style: italic;
+    white-space: nowrap;
+    opacity: 0.75;
+  }
+
   .score-colored {
     color: #7c3aed;
     font-weight: 600;
@@ -437,6 +452,43 @@ mark {
   .low-score {
     color: #dc2626;
   }
+
+  .progress-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    white-space: nowrap;
+  }
+
+  .mini-bar {
+    width: 40px;
+    height: 6px;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .mini-bar-fill {
+    height: 100%;
+    background-color: #2563eb;
+    transition: width 0.3s ease;
+
+    &.completed {
+      background-color: #16a34a;
+    }
+
+    &.high-score-bar {
+      background-color: #16a34a;
+    }
+
+    &.low-score-bar {
+      background-color: #dc2626;
+    }
+  }
 }
 
 .repo-cell-content {
@@ -445,13 +497,6 @@ mark {
   justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
-
-  &:hover {
-    .clear-progress-btn {
-      opacity: 1;
-      visibility: visible;
-    }
-  }
 }
 
 .repo-link-table {
@@ -477,15 +522,13 @@ mark {
   background: none;
   border: none;
   padding: 0.25rem;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 0.25rem;
   transition: all 0.2s ease;
-  opacity: 0;
-  visibility: hidden;
 
   svg {
     width: 0.9rem;

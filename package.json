@@ -4,7 +4,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "dev": "concurrently -n \"frontend,backend\" -c \"cyan,magenta\" \"ng serve\" \"dotnet run --project ../StudyHub/StudyHub.API/StudyHub.API.csproj\"",
+    "build": "ng build --base-href /testmate/ && dotnet build ../StudyHub/StudyHub.API/StudyHub.API.csproj --configuration Release",
     "watch": "ng build --watch --configuration development"
   },
   "private": true,
@@ -17,16 +18,18 @@
     "@angular/platform-browser": "^17.0.0",
     "@angular/platform-browser-dynamic": "^17.0.0",
     "@angular/router": "^17.0.0",
+    "express": "^5.2.1",
+    "katex": "^0.16.9",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
-    "zone.js": "~0.14.2",
-    "katex": "^0.16.9"
+    "zone.js": "~0.14.2"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^17.0.0",
     "@angular/cli": "^17.0.0",
     "@angular/compiler-cli": "^17.0.0",
     "@types/katex": "^0.16.7",
+    "concurrently": "^9.2.3",
     "typescript": "~5.2.2"
   }
 }

@@ -1,0 +1,241 @@
+:host {
+  display: contents;
+}
+
+.tree-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 2.2fr) 70px 80px 110px 70px 80px 130px 80px;
+  align-items: center;
+  column-gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  font-size: 0.85rem;
+  color: #334155;
+
+  &:hover {
+    background-color: #f8fafc;
+  }
+
+  &.can-practice .repo-name {
+    color: #1e293b;
+  }
+
+  &.no-practice .repo-name {
+    color: #64748b;
+  }
+
+  // Rows with children show rolled-up totals across all their descendants, not just
+  // their own questions - a subtle tint marks that the numbers are an aggregate.
+  &.is-aggregate {
+    background-color: #f1f5f9;
+
+    &:hover {
+      background-color: #e2e8f0;
+    }
+
+    .tree-col:not(.tree-col-name) {
+      font-style: italic;
+    }
+  }
+}
+
+.tree-col {
+  min-width: 0;
+}
+
+.tree-col-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+}
+
+.chevron-btn {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  color: var(--primary-color, #2563eb);
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    transition: transform 0.2s ease;
+  }
+
+  &.expanded svg {
+    transform: rotate(90deg);
+  }
+
+  &:hover {
+    background-color: rgba(37, 99, 235, 0.1);
+  }
+}
+
+.chevron-spacer {
+  flex-shrink: 0;
+  width: 1.25rem;
+}
+
+.repo-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  ::ng-deep mark {
+    background-color: #ffeb3b;
+    padding: 0 0.125rem;
+    border-radius: 0.125rem;
+  }
+}
+
+.clear-progress-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0.2rem;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+  margin-left: auto;
+
+  svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
+  &:hover {
+    color: #ef4444;
+    background-color: #fee2e2;
+  }
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-primary-colored {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+// Questions total: black/neutral by default, blue and bolder only while this
+// row is expanded - visually ties the rolled-up number to the breakdown shown below it.
+.total-value {
+  color: #1e293b;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.total-value-active {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+// Only a practicable node's question count is clickable to start practice - underline is the
+// only affordance telling the two apart, since every row otherwise looks identical.
+.total-value-clickable {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: #1d4ed8;
+  }
+}
+
+.text-success-colored {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.text-danger-colored {
+  color: #dc2626;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.avg-time-val {
+  font-weight: 500;
+}
+
+.time-to-complete {
+  font-size: 0.7rem;
+  color: #475569;
+  font-weight: 500;
+  margin-left: 0.3rem;
+  font-style: italic;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.score-colored {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.high-score {
+  color: #059669;
+}
+
+.low-score {
+  color: #dc2626;
+}
+
+.progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.mini-bar {
+  width: 32px;
+  height: 6px;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mini-bar-fill {
+  height: 100%;
+  background-color: #2563eb;
+  transition: width 0.3s ease;
+
+  &.completed {
+    background-color: #16a34a;
+  }
+}
+
+.tree-children {
+  border-left: 2px solid #e2e8f0;
+  margin-left: 1.4rem;
+}

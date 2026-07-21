@@ -19,9 +19,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('answerInput') answerInput?: ElementRef;
   @ViewChild('timerText', { static: false }) timerText!: ElementRef<HTMLDivElement>;
 
-  domain: string = '';
-  topic: string = '';
-  repository: string = '';
+  path: string[] = [];
   isPractice: boolean = false;
 
   questions: Question[] = [];
@@ -63,6 +61,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   // Move / Delete properties
   showMoveQuestionDialog: boolean = false;
   availableRepositories: string[] = [];
+  moveTargetParentPath: string[] = [];
   selectedTargetRepository: string = '';
   isMovingQuestion: boolean = false;
   showDeleteQuestionDialog: boolean = false;
@@ -87,9 +86,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     if (state?.testData) {
       this.questions = state.testData.questions;
       this.testName = state.testData.testName;
-      this.domain = state.testData.domain;
-      this.topic = state.testData.topic;
-      this.repository = state.testData.repository;
+      this.path = state.testData.path;
       this.mode = state.testData.mode || 'practice';
       this.isAIGenerated = state.testData.isAIGenerated || false;
 
@@ -101,21 +98,26 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  get repositoryName(): string {
+    return this.path.length > 0 ? this.path[this.path.length - 1] : '';
+  }
+
+  get ancestorLinks(): { name: string; expandPath: string }[] {
+    const links: { name: string; expandPath: string }[] = [];
+    for (let i = 0; i < this.path.length - 1; i++) {
+      links.push({ name: this.path[i], expandPath: this.path.slice(0, i + 1).join('|') });
+    }
+    return links;
+  }
+
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      this.domain = params['domain'];
-      this.topic = params['topic'];
-      this.repository = params['repository'];
-
-      localStorage.setItem("selectedDomain", this.domain);
-      localStorage.setItem("selectedTopic", this.topic);
-      localStorage.setItem("selectedrepository", this.repository);
-
-      console.log(this.repository);
-    });
-
     this.route.url.subscribe(segments => {
-      this.isPractice = segments[0]?.path === 'practice';
+      this.path = segments.map(s => s.path);
+      this.isPractice = this.router.url.split('?')[0].split('/')[1] === 'practice';
+
+      if (this.path.length > 0) {
+        localStorage.setItem('selectedRepositoryPath', JSON.stringify(this.path));
+      }
     });
 
     this.route.queryParams.subscribe(params => {
@@ -128,10 +130,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.practiceIncorrectOnly = params['practiceIncorrectOnly'] === 'true';
 
       this.hideAnswer = params['hideAnswer'] === 'true';
-      console.log("start: ", start);
-      console.log("end: ", end);
-      console.log("hideAnswer: ", this.hideAnswer);
-      console.log("practiceIncorrectOnly: ", this.practiceIncorrectOnly);
 
       if (this.isAIGenerated) {
         this.loadAIQuestions();
@@ -241,10 +239,9 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
 
+  // Uses the question's own tracked source file + index, so edits always target the
+  // correct physical repository file even when practicing an aggregated (multi-file) session.
   updateQuestionImageUrl(
-    domain: string,
-    topic: string,
-    repository: string,
     questionIndex: number,
     imageUrl: string,
     event: Event
@@ -252,29 +249,21 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     event.preventDefault();
     event.stopPropagation();
 
+    const question = this.questions[questionIndex];
+    if (!question?.__sourcePath || question.__sourceIndex === undefined) return;
 
-    this.dataService.updateQuestionImageUrl(domain, topic, repository, questionIndex, 1, imageUrl).subscribe({
+    this.dataService.updateQuestionImageUrl(question.__sourcePath, question.__sourceIndex, imageUrl).subscribe({
       next: () => {
-        const key = `${domain}|${topic}|${repository}|${questionIndex}`;
-        // Update local cache or state if needed
-        // this.questionImageUrls[key] = imageUrl;
-        // this.openImageUrlMenu = null;
-
-        // Optional: Show success notification
         console.log(`Image URL updated successfully for question at index ${questionIndex}`);
       },
       error: (err) => {
         console.error('Error updating question image URL:', err);
-        // Optional: Show error notification to user
       }
     });
   }
 
   // ANGULAR COMPONENT METHOD
   uploadImageFromClipboard(
-    domain: string,
-    topic: string,
-    repository: string,
     questionIndex: number,
     imageIndex: number,
     event: Event
@@ -282,13 +271,16 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     event.preventDefault();
     event.stopPropagation();
 
+    const question = this.questions[questionIndex];
+    if (!question?.__sourcePath || question.__sourceIndex === undefined) {
+      alert('Unable to determine the source repository for this question');
+      return;
+    }
+    const sourcePath = question.__sourcePath;
+    const sourceIndex = question.__sourceIndex;
+
     // Prompt user for image name
-    //const imageName = prompt('Enter image name (without extension):');
     const imageName = '';
-    // if (!imageName || imageName.trim() === '') {
-    //   console.log('Image upload cancelled');
-    //   return;
-    // }
 
     // Access clipboard
     navigator.clipboard.read().then((clipboardItems) => {
@@ -311,10 +303,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
       clipboardItem.getType(imageType).then((blob) => {
         this.dataService.uploadImageFromClipboard(
-          domain,
-          topic,
-          repository,
-          questionIndex,
+          sourcePath,
+          sourceIndex,
           blob,
           imageName,
           imageIndex
@@ -339,22 +329,28 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
   loadQuestions(start?: number | null, end?: number | null): void {
-    this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
-      next: (questions) => {
+    this.dataService.getRepository(this.path).subscribe({
+      next: (aggregated) => {
+        const allQuestions: Question[] = aggregated.map(a => ({
+          ...a.question,
+          __sourcePath: a.sourcePath,
+          __sourceIndex: a.sourceIndex
+        }));
+
         const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];
 
         // Load practice attempts from server
-        this.dataService.getPracticeAttempts(this.domain, this.topic, this.repository).subscribe({
+        this.dataService.getPracticeAttempts(this.path).subscribe({
           next: (serverAttempts) => {
             console.log("serverAttempts loaded");
             console.log(serverAttempts);
 
             if (this.practiceIncorrectOnly && serverAttempts && serverAttempts.length > 0) {
               const incorrectIndices = serverAttempts
-                .filter(a => !a.skipped && !a.correct)
-                .map(a => a.question_index);
+                .filter((a: QuestionAttempt) => !a.skipped && !a.correct)
+                .map((a: QuestionAttempt) => a.question_index);
 
-              this.questions = incorrectIndices.map(i => questions[i]).filter(q => q !== undefined);
+              this.questions = incorrectIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
 
               // Create FRESH attempts for this session (temporary, not saved)
               this.attempts = this.questions.map((_, index) => ({
@@ -367,14 +363,14 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
               }));
             }
             else if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
-              const indices: number[] = serverAttempts.map(a => a.question_index);
-              this.questions = indices.map(i => questions[i]).filter(q => q !== undefined);
+              const indices: number[] = serverAttempts.map((a: QuestionAttempt) => a.question_index);
+              this.questions = indices.map(i => allQuestions[i]).filter(q => q !== undefined);
             }
             else if (start && end) {
-              this.questions = questions.slice(start - 1, end);
+              this.questions = allQuestions.slice(start - 1, end);
             }
             else {
-              this.questions = questions;
+              this.questions = allQuestions;
             }
 
             if (!this.practiceIncorrectOnly) {
@@ -393,7 +389,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
                   }
                 }
               } else {
-                const localData = localStorage.getItem(this.topic + '_' + this.repository);
+                const localData = localStorage.getItem(this.path.join('|'));
                 if (localData) {
                   this.attempts = JSON.parse(localData);
                   console.log('Loaded attempts from localStorage');
@@ -415,7 +411,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
           error: (err) => {
             console.error('Error loading practice attempts:', err);
             // Try to load from localStorage if server fetch fails
-            const localData = localStorage.getItem(this.topic + '_' + this.repository);
+            const localData = localStorage.getItem(this.path.join('|'));
             if (localData) {
               this.attempts = JSON.parse(localData);
               console.log('Loaded attempts from localStorage after error');
@@ -572,12 +568,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
     //this.showFeedback = !this.hideAnswer;
 
-    console.log("Summary333333333333:");
-    console.log("showFeedback", this.showFeedback);
-    console.log("isAnswerSubmitted", this.isAnswerSubmitted);
-    console.log("incorrectPreviousAttempt", this.attempts[this.currentIndex].incorrectPreviousAttempt);
-    console.log("getQuestionStatus", this.getQuestionStatus(this.currentIndex));
-
     this.focusAnswerInput();
   }
 
@@ -663,11 +653,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   revealAnswer(): void {
-    console.log("Summary:");
-    console.log("showFeedback", this.showFeedback);
-    console.log("isAnswerSubmitted", this.isAnswerSubmitted);
-    console.log("incorrectPreviousAttempt", this.attempts[this.currentIndex].incorrectPreviousAttempt);
-    console.log("getQuestionStatus", this.getQuestionStatus(this.currentIndex));
     this.showFeedback = true;
   }
 
@@ -753,10 +738,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.currentIndex--;
       this.initializeAnswer();
     }
-    console.log("Summary2:");
-    console.log(this.showFeedback);
-    console.log(this.isAnswerSubmitted);
-    console.log(this.getQuestionStatus(this.currentIndex));
   }
 
   getQuestionStatus(index: number): string {
@@ -825,16 +806,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       incorrectPreviousAttempt: !a.skipped && !a.correct
     }));
 
-    const incorrectIndices = this.attempts
-      .map((a, i) => !a.correct && !a.skipped ? i : -1)
-      .filter(i => i !== -1);
-
-    console.log('finishTest');
-    console.log(incorrectIndices);
-    console.log(this.attempts);
-
-
-
     if (!this.isPractice) {
       this.saveTestResult();
     }
@@ -852,19 +823,17 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const profileName = this.dataService.getProfileName();
     this.dataService.savePracticeAttempts(
-      this.domain,
-      this.topic,
-      this.repository,
+      this.path,
       profileName,
       this.attempts
     ).subscribe({
       next: () => {
         console.log('Progress auto-saved to server');
-        localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
+        localStorage.setItem(this.path.join('|'), JSON.stringify(this.attempts));
       },
       error: (err) => {
         console.error('Auto-save to server failed, saving to localStorage', err);
-        localStorage.setItem(this.topic + '_' + this.repository, JSON.stringify(this.attempts));
+        localStorage.setItem(this.path.join('|'), JSON.stringify(this.attempts));
       }
     });
   }
@@ -929,7 +898,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
   saveAsTestInstance(): void {
     if (this.practiceIncorrectOnly) return;
-    let testName = `${this.repository} - ${new Date().toLocaleDateString()}`;
+    let testName = `${this.repositoryName} - ${new Date().toLocaleDateString()}`;
 
     if (this.parentTestId && this.retestType) {
       testName = this.generateRetestName();
@@ -938,9 +907,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     const testInstance = {
       test_id: this.dataService.generateTestId(),
       test_name: testName,
-      domain: this.domain,
-      topic: this.topic,
-      repository: this.repository,
+      path: this.path,
       parent_test: this.parentTestId,
       retest_type: this.retestType as any,
       created_on: new Date().toISOString(),
@@ -958,7 +925,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   generateRetestName(): string {
-    let baseName = `${this.repository}`;
+    let baseName = `${this.repositoryName}`;
 
     if (this.retestType === 'incorrect_only') {
       baseName += ' - Incorrect Only';
@@ -972,7 +939,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   retakeFull(): void {
-    this.router.navigate(['/test', this.domain, this.topic, this.repository]);
+    this.router.navigate(['/test', ...this.path]);
     window.location.reload();
   }
 
@@ -981,15 +948,13 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       .map((a, i) => !a.correct && !a.skipped ? i : -1)
       .filter(i => i !== -1);
 
-    console.log(incorrectIndices);
-
     if (incorrectIndices.length > 0) {
 
       this.dataService.getTestResults(this.dataService.getProfileName()).subscribe({
         next: (tests) => {
           const currentTest = tests[0];
 
-          this.router.navigate(['/test', this.domain, this.topic, this.repository], {
+          this.router.navigate(['/test', ...this.path], {
             queryParams: {
               retestType: 'incorrect_only',
               parentTestId: currentTest?.test_id,
@@ -1013,7 +978,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         next: (tests) => {
           const currentTest = tests[0];
 
-          this.router.navigate(['/test', this.domain, this.topic, this.repository], {
+          this.router.navigate(['/test', ...this.path], {
             queryParams: {
               retestType: 'skipped_only',
               parentTestId: currentTest?.test_id,
@@ -1031,7 +996,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   goToList(): void {
-    this.router.navigate(['/'], { queryParams: { domain: this.domain, topic: this.topic } });
+    this.router.navigate(['/'], { queryParams: { expandPath: this.path.slice(0, -1).join('|') } });
   }
 
   viewResults(): void {
@@ -1065,10 +1030,18 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   loadAvailableRepositories(): void {
-    this.dataService.getRepositoriesForTopic(this.domain, this.topic).subscribe({
+    const referenceIndex = this.selectedQuestionIndices.size > 0
+      ? Math.min(...Array.from(this.selectedQuestionIndices))
+      : this.currentIndex;
+    const referenceQuestion = this.questions[referenceIndex];
+    const sourcePath = referenceQuestion?.__sourcePath || this.path;
+    this.moveTargetParentPath = sourcePath.slice(0, -1);
+    const currentName = sourcePath[sourcePath.length - 1];
+
+    this.dataService.getSiblingRepositories(this.moveTargetParentPath).subscribe({
       next: (repositories) => {
         // Filter out the current repository
-        this.availableRepositories = repositories.filter(repo => repo !== this.repository);
+        this.availableRepositories = repositories.filter(repo => repo !== currentName);
       },
       error: (err) => {
         console.error('Error loading repositories:', err);
@@ -1096,13 +1069,14 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.isMovingQuestion = true;
 
-    this.dataService.moveQuestions(
-      this.domain,
-      this.topic,
-      this.repository,
-      indicesToMove,
-      this.selectedTargetRepository
-    ).subscribe({
+    const items = indicesToMove
+      .map(i => this.questions[i])
+      .filter(q => q && q.__sourcePath && q.__sourceIndex !== undefined)
+      .map(q => ({ sourcePath: q.__sourcePath!, sourceIndex: q.__sourceIndex! }));
+
+    const targetPath = [...this.moveTargetParentPath, this.selectedTargetRepository];
+
+    this.dataService.moveQuestions(items, targetPath).subscribe({
       next: () => {
         this.closeMoveQuestionDialog();
         this.selectedQuestionIndices.clear();
@@ -1147,9 +1121,13 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   reloadQuestions(): void {
     this.loading = true;
 
-    this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
-      next: (questions) => {
-        this.questions = questions;
+    this.dataService.getRepository(this.path).subscribe({
+      next: (aggregated) => {
+        this.questions = aggregated.map(a => ({
+          ...a.question,
+          __sourcePath: a.sourcePath,
+          __sourceIndex: a.sourceIndex
+        }));
 
         // Adjust current index if it's now out of bounds
         if (this.currentIndex >= this.questions.length) {
@@ -1157,7 +1135,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         // Reinitialize attempts by fetching latest from server (to keep markings correct after move/delete)
-        this.dataService.getPracticeAttempts(this.domain, this.topic, this.repository).subscribe({
+        this.dataService.getPracticeAttempts(this.path).subscribe({
           next: (serverAttempts) => {
             if (serverAttempts && serverAttempts.length > 0) {
               this.attempts = serverAttempts;
@@ -1209,8 +1187,6 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  // Add these methods to TestComponent class
-
   openDeleteQuestionDialog(): void {
     this.showDeleteQuestionDialog = true;
   }
@@ -1222,7 +1198,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   deleteCurrentQuestion(): void {
     const confirmDelete = confirm(
       `Are you sure you want to DELETE this question?\n\n` +
-      `Repository: ${this.repository}\n` +
+      `Repository: ${this.repositoryName}\n` +
       `Question ${this.currentIndex + 1} of ${this.questions.length}\n\n` +
       `This action CANNOT be undone!\n` +
       `The question will be permanently removed from the repository.`
@@ -1232,13 +1208,17 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    const question = this.currentQuestion;
+    if (!question.__sourcePath || question.__sourceIndex === undefined) {
+      alert('Unable to determine the source repository for this question');
+      return;
+    }
+
     this.isDeletingQuestion = true;
 
     this.dataService.deleteQuestion(
-      this.domain,
-      this.topic,
-      this.repository,
-      this.currentIndex
+      question.__sourcePath,
+      question.__sourceIndex
     ).subscribe({
       next: () => {
         //alert('Question successfully deleted');

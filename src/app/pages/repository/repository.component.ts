@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
-import { Question } from '../../models/question.model';
+import { Question, RepositorySummary } from '../../models/question.model';
 import { TestConfiguration, TestAttempt } from '../../models/test-config.model';
 
 @Component({
@@ -14,11 +14,13 @@ import { TestConfiguration, TestAttempt } from '../../models/test-config.model';
   styleUrls: ['./repository.component.scss']
 })
 export class RepositoryComponent implements OnInit {
-  domain: string = '';
-  topic: string = '';
-  repository: string = '';
+  path: string[] = [];
+  repositoryName: string = '';
   questions: Question[] = [];
   loading = true;
+
+  summary: RepositorySummary | null = null;
+  canPractice = false;
 
   rangeStart: number = 1;
   rangeEnd: number = 0;
@@ -51,17 +53,41 @@ export class RepositoryComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      this.domain = params['domain'];
-      this.topic = params['topic'];
-      this.repository = params['repository'];
+    this.route.url.subscribe(segments => {
+      this.path = segments.map(s => s.path);
+      if (this.path.length === 0) {
+        this.router.navigate(['/']);
+        return;
+      }
+      this.repositoryName = this.path[this.path.length - 1];
 
-      localStorage.setItem("selectedDomain", this.domain);
-      localStorage.setItem("selectedTopic", this.topic);
-      localStorage.setItem("selectedrepository", this.repository);
+      localStorage.setItem('selectedRepositoryPath', JSON.stringify(this.path));
 
+      this.loading = true;
       this.loadQuestions();
       this.loadSavedTests();
+      this.loadSummary();
+    });
+  }
+
+  get ancestorLinks(): { name: string; expandPath: string }[] {
+    const links: { name: string; expandPath: string }[] = [];
+    for (let i = 0; i < this.path.length - 1; i++) {
+      links.push({ name: this.path[i], expandPath: this.path.slice(0, i + 1).join('|') });
+    }
+    return links;
+  }
+
+  loadSummary(): void {
+    this.dataService.getRepositorySummaries(this.dataService.getProfileName()).subscribe({
+      next: (summaries) => {
+        const key = this.path.join('|');
+        this.summary = summaries[key] || null;
+        this.canPractice = !!this.summary?.canPractice;
+      },
+      error: (err) => {
+        console.error('Error loading repository summary:', err);
+      }
     });
   }
 
@@ -81,10 +107,14 @@ export class RepositoryComponent implements OnInit {
   }
 
   loadQuestions(): void {
-    this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
-      next: (questions) => {
-        this.questions = questions;
-        this.rangeEnd = questions.length;
+    this.dataService.getRepository(this.path).subscribe({
+      next: (aggregated) => {
+        this.questions = aggregated.map(a => ({
+          ...a.question,
+          __sourcePath: a.sourcePath,
+          __sourceIndex: a.sourceIndex
+        }));
+        this.rangeEnd = this.questions.length;
         this.testName = this.getDefaultTestName();
         this.loading = false;
       },
@@ -96,7 +126,7 @@ export class RepositoryComponent implements OnInit {
   }
 
   loadSavedTests(): void {
-    this.dataService.getTestConfigurations(this.domain, this.topic, this.repository).subscribe({
+    this.dataService.getTestConfigurations(this.path).subscribe({
       next: (tests) => {
         this.savedTests = tests;
       },
@@ -186,9 +216,9 @@ export class RepositoryComponent implements OnInit {
 
   getDefaultTestName(): string {
     if (this.useRange && this.rangeStart && this.rangeEnd) {
-      return `${this.repository} (${this.rangeStart}–${this.rangeEnd})`;
+      return `${this.repositoryName} (${this.rangeStart}–${this.rangeEnd})`;
     }
-    return this.repository;
+    return this.repositoryName;
   }
 
   validateRange(): void {
@@ -201,9 +231,7 @@ export class RepositoryComponent implements OnInit {
   saveTest(): void {
     const config: TestConfiguration = {
       test_name: this.testName,
-      domain: this.domain,
-      topic: this.topic,
-      repository: this.repository,
+      path: this.path,
       question_range: {
         start: this.useRange ? this.rangeStart : 1,
         end: this.useRange ? this.rangeEnd : this.questions.length
@@ -251,7 +279,7 @@ export class RepositoryComponent implements OnInit {
       return;
     }
 
-    this.router.navigate(['/test', this.domain, this.topic, this.repository], {
+    this.router.navigate(['/test', ...this.path], {
       queryParams: {
         testConfigId: testConfig.config_id,
         start: testConfig.question_range.start,
@@ -276,15 +304,12 @@ export class RepositoryComponent implements OnInit {
   startPractice(): void {
     if (this.clearPreviousAttempts) {
       this.dataService.deletePracticeAttempts(
-        this.domain,
-        this.topic,
-        this.repository,
+        this.path,
         this.dataService.getProfileName()
       ).subscribe({
         next: () => {
           console.log('Previous practice attempts cleared successfully');
-          const cacheKey = `${this.topic}_${this.repository}`;
-          localStorage.removeItem(cacheKey);
+          localStorage.removeItem(this.path.join('|'));
           this.navigateToPractice();
         },
         error: (err) => {
@@ -308,7 +333,7 @@ export class RepositoryComponent implements OnInit {
     if (this.practiceIncorrectOnly) {
       queryParams.practiceIncorrectOnly = 'true';
     }
-    this.router.navigate(['/practice', this.domain, this.topic, this.repository], { queryParams });
+    this.router.navigate(['/practice', ...this.path], { queryParams });
   }
 
   deleteTest(testConfig: TestConfiguration): void {

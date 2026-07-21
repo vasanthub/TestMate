@@ -1,12 +1,12 @@
 <div class="test-container" *ngIf="!loading && testStarted">
   <div class="breadcrumb">
     <a routerLink="/">Home</a>
+    <ng-container *ngFor="let crumb of ancestorLinks">
+      <span class="separator">/</span>
+      <a routerLink="/" [queryParams]="{ expandPath: crumb.expandPath }">{{ crumb.name }}</a>
+    </ng-container>
     <span class="separator">/</span>
-    <a routerLink="/" [queryParams]="{ domain: domain }">{{ domain }}</a>
-    <span class="separator">/</span>
-    <a routerLink="/" [queryParams]="{ domain: domain, topic: topic }">{{ topic }}</a>
-    <span class="separator">/</span>
-    <span class="current">{{ repository }}</span>
+    <span class="current">{{ repositoryName }}</span>
   </div>
   <div *ngIf="!showResult" class="test-layout">
     <!-- Main Question Area -->
@@ -33,19 +33,19 @@
           </button>
 
           <button class="btn-icon"
-            (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 1, $event)" title="Image Upload">
+            (click)="uploadImageFromClipboard(currentIndex, 1, $event)" title="Image Upload">
             📁1
           </button>
           <button class="btn-icon"
-            (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 2, $event)" title="Image Upload">
+            (click)="uploadImageFromClipboard(currentIndex, 2, $event)" title="Image Upload">
             📁2
           </button>
           <button class="btn-icon"
-            (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 3, $event)" title="Image Upload">
+            (click)="uploadImageFromClipboard(currentIndex, 3, $event)" title="Image Upload">
             📁3
           </button>
           <button class="btn-icon"
-            (click)="uploadImageFromClipboard(domain, topic, repository, currentIndex, 4, $event)" title="Image Upload">
+            (click)="uploadImageFromClipboard(currentIndex, 4, $event)" title="Image Upload">
             📁4
           </button>
 
@@ -391,7 +391,7 @@
 
     <div class="modal-body">
       <div class="current-question-info">
-        <p><strong>Current Repository:</strong> {{ repository }}</p>
+        <p><strong>Current Repository:</strong> {{ (currentQuestion.__sourcePath ? currentQuestion.__sourcePath[currentQuestion.__sourcePath.length - 1] : repositoryName) }}</p>
         <p *ngIf="selectedQuestionIndices.size === 0"><strong>Moving current question ({{ currentIndex + 1
             }})</strong></p>
         <p *ngIf="selectedQuestionIndices.size > 0"><strong>Moving {{ selectedQuestionIndices.size }} selected
@@ -448,7 +448,7 @@
 
     <div class="modal-body">
       <div class="current-question-info danger-info">
-        <p><strong>Repository:</strong> {{ repository }}</p>
+        <p><strong>Repository:</strong> {{ (currentQuestion.__sourcePath ? currentQuestion.__sourcePath[currentQuestion.__sourcePath.length - 1] : repositoryName) }}</p>
         <p><strong>Question {{ currentIndex + 1 }} of {{ questions.length }}</strong></p>
         <div class="question-preview">
           {{ currentQuestion.question.substring(0, 150) }}{{ currentQuestion.question.length > 150 ? '...' : '' }}

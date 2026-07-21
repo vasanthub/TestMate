@@ -1,12 +1,12 @@
 <div class="container">
   <div class="breadcrumb">
     <a routerLink="/">Home</a>
+    <ng-container *ngFor="let crumb of ancestorLinks">
+      <span class="separator">/</span>
+      <a routerLink="/" [queryParams]="{ expandPath: crumb.expandPath }">{{ crumb.name }}</a>
+    </ng-container>
     <span class="separator">/</span>
-    <a routerLink="/" [queryParams]="{ domain: domain }">{{ domain }}</a>
-    <span class="separator">/</span>
-    <a routerLink="/" [queryParams]="{ domain: domain, topic: topic }">{{ topic }}</a>
-    <span class="separator">/</span>
-    <span class="current">{{ repository }}</span>
+    <span class="current">{{ repositoryName }}</span>
   </div>
 
   <div *ngIf="loading" class="loading">
@@ -18,8 +18,8 @@
     <div class="card header-card collapsible-section">
       <div class="collapsible-header" (click)="toggleSection('header')">
         <div class="header-content">
-          <h1 class="title">{{ repository }}</h1>
-          <p class="subtitle">{{ domain }} • {{ topic }}</p>
+          <h1 class="title">{{ repositoryName }}</h1>
+          <p class="subtitle">{{ path.slice(0, -1).join(' • ') }}</p>
         </div>
         <svg class="chevron-icon" [class.expanded]="isSectionExpanded('header')" viewBox="0 0 24 24" fill="none"
           stroke="currentColor">
@@ -49,7 +49,15 @@
       </div>
     </div>
 
-    <div class="card practice-card collapsible-section">
+    <div class="card notice-card" *ngIf="!canPractice">
+      <p>
+        This repository has {{ summary?.totalQuestions || 0 }} questions across all its nested repositories,
+        which is more than this app's practice limit. Direct practice is disabled here &mdash; open one of its
+        child repositories from the Home page to practice a smaller set.
+      </p>
+    </div>
+
+    <div class="card practice-card collapsible-section" *ngIf="canPractice">
       <div class="collapsible-header" (click)="toggleSection('practice')">
         <h2 class="section-title">
           <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -195,7 +203,7 @@
       </div>
     </div>
 
-    <div class="card options-card collapsible-section">
+    <div class="card options-card collapsible-section" *ngIf="canPractice">
       <div class="collapsible-header" (click)="toggleSection('createTest')">
         <h2 class="section-title">
           <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">

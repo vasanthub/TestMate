@@ -24,7 +24,7 @@
               stroke-linejoin="round" />
           </svg>
           <input type="text" [(ngModel)]="searchQuery" (input)="onSearch()"
-            placeholder="Search domains, topics, or repositories..." class="search-input">
+            placeholder="Search repositories..." class="search-input">
           <button *ngIf="searchQuery" (click)="clearSearch()" class="clear-button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -45,143 +45,25 @@
         </div>
       </div>
 
-      <div class="domains">
-        <div *ngFor="let domain of getFilteredDomains()" class="domain-card">
-          <div class="domain-header" (click)="toggleDomain(domain)">
-            <svg class="domain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <h2 class="domain-title">{{ domain }}</h2>
-            <svg class="chevron-icon" [class.expanded]="isDomainExpanded(domain)" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor">
-              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </div>
-
-          <div class="topics" [class.expanded]="isDomainExpanded(domain)">
-            <div *ngFor="let topic of getFilteredTopics(domain)" class="topic-card">
-              <div class="topic-header" (click)="toggleTopic(domain, topic)">
-                <h3 class="topic-title">{{ topic }}</h3>
-                <svg class="chevron-icon small" [class.expanded]="isTopicExpanded(domain, topic)" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor">
-                  <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </div>
-              <div class="repositories" [class.expanded]="isTopicExpanded(domain, topic)">
-                <table class="stats-table">
-                  <thead>
-                    <tr>
-                      <th>Repository</th>
-                      <th class="text-center">Questions</th>
-                      <th class="text-center">Attempted</th>
-                      <th class="text-center">%</th>
-                      <th class="text-center">Correct</th>
-                      <th class="text-center">Incorrect</th>
-                      <th class="text-right">Avg. Time</th>
-                      <th class="text-right">Percentage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let repo of getFilteredRepositories(domain, topic)">
-                      <td>
-                        <div class="repo-cell-content">
-                          <a (click)="navigateToPractice(domain, topic, repo)" class="repo-link-table">
-                            <svg class="repo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <path
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            <span [innerHTML]="highlightMatch(repo)"></span>
-                          </a>
-                          <button class="clear-progress-btn" (click)="clearProgress(domain, topic, repo, $event)"
-                            title="Clear progress" *ngIf="getRepositorySummary(domain, topic, repo)?.attempted > 0">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <path
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                      <ng-container *ngIf="getRepositorySummary(domain, topic, repo) as summary; else noStats">
-                        <td class="text-center text-primary-colored">{{ summary.totalQuestions }}</td>
-                        <td class="text-center">
-                          {{ summary.attempted || '' }}
-                        </td>
-                        <td class="text-center">
-                          <div class="progress-cell" *ngIf="summary.attempted > 0">
-                            <div class="mini-bar">
-                              <div class="mini-bar-fill"
-                                [class.completed]="summary.attempted === summary.totalQuestions"
-                                [style.width.%]="(summary.attempted * 100 / summary.totalQuestions)"></div>
-                            </div>
-                            {{ (summary.attempted * 100 / summary.totalQuestions | number:'1.0-0') }}%
-                          </div>
-                        </td>
-                        <td class="text-center text-success-colored">{{ summary.correct || '' }}</td>
-                        <td class="text-center">
-                          <a *ngIf="summary.incorrect > 0" (click)="practiceIncorrect(domain, topic, repo)"
-                            class="text-danger-colored cursor-pointer" title="Practice Incorrect Only">
-                            {{ summary.incorrect }}
-                          </a>
-                          <span *ngIf="summary.incorrect === 0 && summary.attempted > 0">{{ summary.incorrect }}</span>
-                        </td>
-                        <td class="text-right">
-                          <span class="avg-time-val">{{ summary.formattedAvgTime || '' }}</span>
-                          <span *ngIf="summary.timeToComplete" class="time-to-complete"
-                            title="Estimated time to complete remaining questions">
-                            ({{ summary.timeToComplete }} left)
-                          </span>
-                        </td>
-                        <td class="text-right score-colored" [class.high-score]="summary.score >= 80"
-                          [class.low-score]="summary.score < 50">
-                          {{ summary.attempted > 0 ? summary.score + '%' : '' }}
-                        </td>
-                      </ng-container>
-                      <ng-template #noStats>
-                        <td class="text-center"></td>
-                        <td class="text-center"></td>
-                        <td class="text-center"></td>
-                        <td class="text-center"></td>
-                        <td class="text-center"></td>
-                        <td class="text-right"></td>
-                        <td class="text-right"></td>
-                      </ng-template>
-
-                      <!-- Status selection hidden as per request -->
-                      <td *ngIf="false">
-                        <button class="status-badge"
-                          [class.not-started]="getRepositoryStatus(domain, topic, repo) === 'not_started'"
-                          [class.started]="getRepositoryStatus(domain, topic, repo) === 'started'"
-                          [class.completed]="getRepositoryStatus(domain, topic, repo) === 'completed'"
-                          (click)="toggleStatusMenu(domain, topic, repo, $event)">
-                          {{ getRepositoryStatus(domain, topic, repo) === 'not_started' ? 'Not Started' :
-                          getRepositoryStatus(domain, topic, repo) === 'started' ? 'Started' : 'Completed' }}
-                        </button>
-                        <div class="status-menu" *ngIf="isStatusMenuOpen(domain, topic, repo)">
-                          <button class="status-option not-started"
-                            (click)="updateRepositoryStatus(domain, topic, repo, 'not_started', $event)">
-                            Not Started
-                          </button>
-                          <button class="status-option started"
-                            (click)="updateRepositoryStatus(domain, topic, repo, 'started', $event)">
-                            Started
-                          </button>
-                          <button class="status-option completed"
-                            (click)="updateRepositoryStatus(domain, topic, repo, 'completed', $event)">
-                            Completed
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+      <div class="tree-container">
+        <div class="tree-header">
+          <div class="tree-col tree-col-name">Repository</div>
+          <div class="tree-col text-center">Questions</div>
+          <div class="tree-col text-center">Attempted</div>
+          <div class="tree-col text-center">%</div>
+          <div class="tree-col text-center">Correct</div>
+          <div class="tree-col text-center">Incorrect</div>
+          <div class="tree-col text-right">Avg. Time</div>
+          <div class="tree-col text-right">Score</div>
         </div>
+
+        <app-repository-tree-node *ngFor="let root of tree" [node]="root" [depth]="0" [expandedPaths]="expandedPaths"
+          [summaries]="repositorySummaries" [visiblePaths]="visiblePaths" [searchQuery]="searchQuery"
+          (toggleExpand)="toggleExpand($event)" (navigate)="navigateToPractice($event)"
+          (practiceIncorrect)="practiceIncorrect($event)" (clearProgress)="clearProgress($event)">
+        </app-repository-tree-node>
+
+        <div *ngIf="tree.length === 0" class="empty-state">No repositories found.</div>
       </div>
     </div>
 

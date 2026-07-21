@@ -31,22 +31,22 @@ export class JsonViewerComponent implements OnInit {
   treeData: TreeNode[] = [];
   showRefreshButton: boolean = false;
 
-  domain: string| null = '';
-  topic: string| null = '';
-  repository: string| null = '';
+  path: string[] = [];
 
 
   constructor(
       private dataService: DataService
     ) {}
-  
+
 
   ngOnInit(): void {
-    this.domain=localStorage.getItem("selectedDomain");
-    this.topic=localStorage.getItem("selectedTopic");
-    this.repository=localStorage.getItem("selectedrepository");
-   
-    this.loadQuestions();    
+    try {
+      this.path = JSON.parse(localStorage.getItem("selectedRepositoryPath") || "[]");
+    } catch {
+      this.path = [];
+    }
+
+    this.loadQuestions();
   }
 
   onFileSelected(event: any): void {
@@ -138,15 +138,15 @@ export class JsonViewerComponent implements OnInit {
   }
 
   loadQuestions(): void {
-    if (this.domain && this.topic && this.repository){
-      this.dataService.getRepository(this.domain, this.topic, this.repository).subscribe({
-            next: (questions) => {              
-              this.jsonData=questions;
+    if (this.path.length > 0) {
+      this.dataService.getRepository(this.path).subscribe({
+            next: (aggregated) => {
+              this.jsonData = aggregated.map(a => a.question);
               this.renderJSON();
-              this.isInputCollapsed = true;              
+              this.isInputCollapsed = true;
             },
             error: (err) => {
-              console.error('Error loading questions:', err);              
+              console.error('Error loading questions:', err);
             }
           });
     }

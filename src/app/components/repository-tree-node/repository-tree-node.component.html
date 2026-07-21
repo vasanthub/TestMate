@@ -1,0 +1,74 @@
+<ng-container *ngIf="isVisible">
+  <div class="tree-row" [style.padding-left.rem]="depth * 1.1" (click)="onRowClick()"
+       [class.can-practice]="summary?.canPractice" [class.no-practice]="!summary?.canPractice"
+       [class.is-aggregate]="node.hasChildren" [title]="node.hasChildren ? 'Totals include all nested repositories' : ''">
+    <div class="tree-col tree-col-name">
+      <button *ngIf="node.hasChildren" class="chevron-btn" (click)="onChevronClick($event)"
+        [class.expanded]="isExpanded" title="Show/hide contents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M9 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <span *ngIf="!node.hasChildren" class="chevron-spacer"></span>
+      <span class="repo-name" [innerHTML]="highlight(node.name)"></span>
+      <button *ngIf="summary && summary.attempted > 0" class="clear-progress-btn" (click)="onClearProgress($event)"
+        title="Clear progress">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <ng-container *ngIf="summary as s; else noStats">
+      <div class="tree-col text-center total-value" [class.total-value-active]="isExpanded"
+        [class.total-value-clickable]="s.canPractice" (click)="onQuestionsClick($event)"
+        [title]="s.canPractice ? 'Start practice' : ''">{{ s.totalQuestions }}</div>
+      <div class="tree-col text-center">{{ s.attempted || '' }}</div>
+      <div class="tree-col text-center">
+        <div class="progress-cell" *ngIf="s.attempted > 0">
+          <div class="mini-bar">
+            <div class="mini-bar-fill" [class.completed]="s.attempted === s.totalQuestions"
+              [style.width.%]="s.completionPercent"></div>
+          </div>
+          {{ s.completionPercent | number:'1.0-0' }}%
+        </div>
+      </div>
+      <div class="tree-col text-center text-success-colored">{{ s.correct || '' }}</div>
+      <div class="tree-col text-center">
+        <a *ngIf="s.incorrect > 0" (click)="onPracticeIncorrect($event)" class="text-danger-colored cursor-pointer"
+          title="Practice Incorrect Only">
+          {{ s.incorrect }}
+        </a>
+        <span *ngIf="s.incorrect === 0 && s.attempted > 0">{{ s.incorrect }}</span>
+      </div>
+      <div class="tree-col text-right">
+        <span class="avg-time-val">{{ s.formattedAvgTime || s.avgTime || '' }}</span>
+        <span *ngIf="s.timeToComplete" class="time-to-complete" title="Estimated time to complete remaining questions">
+          ({{ s.timeToComplete }} left)
+        </span>
+      </div>
+      <div class="tree-col text-right score-colored" [class.high-score]="s.score >= 80" [class.low-score]="s.score < 50">
+        {{ s.attempted > 0 ? s.score + '%' : '' }}
+      </div>
+    </ng-container>
+    <ng-template #noStats>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+      <div class="tree-col"></div>
+    </ng-template>
+  </div>
+
+  <div class="tree-children" *ngIf="node.hasChildren && isExpanded">
+    <app-repository-tree-node *ngFor="let child of node.children" [node]="child" [depth]="depth + 1"
+      [expandedPaths]="expandedPaths" [summaries]="summaries" [visiblePaths]="visiblePaths"
+      [searchQuery]="searchQuery" (toggleExpand)="toggleExpand.emit($event)" (navigate)="navigate.emit($event)"
+      (practiceIncorrect)="practiceIncorrect.emit($event)" (clearProgress)="clearProgress.emit($event)">
+    </app-repository-tree-node>
+  </div>
+</ng-container>

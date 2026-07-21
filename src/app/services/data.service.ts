@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { Question, TestInstance, Repository, DomainStructure } from '../models/question.model';
+import { Question, AggregatedQuestion, TestInstance, RepositoryNode, TestMateSettings } from '../models/question.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -24,6 +24,16 @@ export class DataService {
     return this.apiUrl;
   }
 
+  private pathSegment(path: string[]): string {
+    return path.map(p => encodeURIComponent(p)).join('/');
+  }
+
+  private pathQuery(path: string[], extra: { [key: string]: string } = {}): string {
+    const params = path.map(p => `path=${encodeURIComponent(p)}`);
+    Object.keys(extra).forEach(key => params.push(`${key}=${encodeURIComponent(extra[key])}`));
+    return params.join('&');
+  }
+
   saveTestAttempt(attempt: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/test-attempts`, attempt);
   }
@@ -40,12 +50,16 @@ export class DataService {
     this.profileName$.next(name);
   }
 
-  getDomainStructure(): Observable<DomainStructure> {
-    return this.http.get<DomainStructure>(`${this.apiUrl}/structure`);
+  getSettings(): Observable<TestMateSettings> {
+    return this.http.get<TestMateSettings>(`${this.apiUrl}/testmate-settings`);
   }
 
-  getRepository(domain: string, topic: string, repository: string): Observable<Question[]> {
-    return this.http.get<Question[]>(`${this.apiUrl}/repository/${domain}/${topic}/${repository}`);
+  getTree(): Observable<RepositoryNode[]> {
+    return this.http.get<RepositoryNode[]>(`${this.apiUrl}/structure`);
+  }
+
+  getRepository(path: string[]): Observable<AggregatedQuestion[]> {
+    return this.http.get<AggregatedQuestion[]>(`${this.apiUrl}/repository/${this.pathSegment(path)}`);
   }
 
   generateMCQs(topic: string): Observable<Question[]> {
@@ -75,9 +89,9 @@ export class DataService {
     return this.http.post(`${this.apiUrl}/test-configurations`, config);
   }
 
-  getTestConfigurations(domain: string, topic: string, repository: string): Observable<any[]> {
+  getTestConfigurations(path: string[]): Observable<any[]> {
     const profile = this.getProfileName();
-    return this.http.get<any[]>(`${this.apiUrl}/test-configurations?domain=${domain}&topic=${topic}&repository=${repository}&profileName=${profile}`);
+    return this.http.get<any[]>(`${this.apiUrl}/test-configurations?${this.pathQuery(path, { profileName: profile })}`);
   }
 
   deleteTestConfiguration(configId: string): Observable<any> {
@@ -172,8 +186,6 @@ export class DataService {
     return Math.round((correct / questions.length) * 100);
   }
 
-  // Add these methods to your existing DataService
-
   getRepositorySummaries(profileName?: string): Observable<{ [key: string]: any }> {
     const profile = profileName || this.getProfileName();
     return this.http.get<{ [key: string]: any }>(`${this.apiUrl}/repository-summaries?profileName=${profile}`);
@@ -183,48 +195,36 @@ export class DataService {
     return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/repository-status?profileName=${profileName}`);
   }
 
-  updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, profileName: string = 'default'): Observable<any> {
+  updateRepositoryStatus(path: string[], status: string, profileName: string = 'default'): Observable<any> {
     return this.http.post(`${this.apiUrl}/repository-status`, {
-      domain,
-      topic,
-      repository,
+      path,
       status,
       profileName
     });
   }
 
   updateQuestionImageUrl(
-    domain: string,
-    topic: string,
-    repository: string,
-    questionIndex: number,
-    imageIndex: number,
+    sourcePath: string[],
+    sourceIndex: number,
     imageUrl: string
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/question-image-url`, {
-      domain,
-      topic,
-      repository,
-      questionIndex,
-      imageIndex,
+      sourcePath,
+      sourceIndex,
       imageUrl
     });
   }
 
   uploadImageFromClipboard(
-    domain: string,
-    topic: string,
-    repository: string,
-    questionIndex: number,
+    sourcePath: string[],
+    sourceIndex: number,
     imageBlob: Blob,
     imageName: string,
     imageIndex: number
   ): Observable<any> {
     const formData = new FormData();
-    formData.append('domain', domain);
-    formData.append('topic', topic);
-    formData.append('repository', repository);
-    formData.append('questionIndex', questionIndex.toString());
+    sourcePath.forEach(segment => formData.append('sourcePath', segment));
+    formData.append('sourceIndex', sourceIndex.toString());
     formData.append('imageName', imageName);
     formData.append('imageIndex', imageIndex.toString());
     formData.append('image', imageBlob, `${imageName}.png`);
@@ -233,81 +233,56 @@ export class DataService {
   }
 
   savePracticeAttempts(
-    domain: string,
-    topic: string,
-    repository: string,
+    path: string[],
     profileName: string,
     attempts: any[]
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/practice-attempts`, {
-      domain,
-      topic,
-      repository,
+      path,
       profileName,
       attempts
     });
   }
 
   getPracticeAttempts(
-    domain: string,
-    topic: string,
-    repository: string,
+    path: string[],
     profileName?: string
   ): Observable<any[]> {
     const profile = profileName || this.getProfileName();
-    const url = `${this.apiUrl}/practice-attempts?domain=${encodeURIComponent(domain)}&topic=${encodeURIComponent(topic)}&repository=${encodeURIComponent(repository)}&profileName=${encodeURIComponent(profile)}`;
-    return this.http.get<any[]>(url);
+    return this.http.get<any[]>(`${this.apiUrl}/practice-attempts?${this.pathQuery(path, { profileName: profile })}`);
   }
 
   deletePracticeAttempts(
-    domain: string,
-    topic: string,
-    repository: string,
+    path: string[],
     profileName?: string
   ): Observable<any> {
     const profile = profileName || this.getProfileName();
-    const url = `${this.apiUrl}/practice-attempts/delete?domain=${encodeURIComponent(domain)}&topic=${encodeURIComponent(topic)}&repository=${encodeURIComponent(repository)}&profileName=${encodeURIComponent(profile)}`;
-    return this.http.post(url, null);
+    return this.http.post(`${this.apiUrl}/practice-attempts/delete?${this.pathQuery(path, { profileName: profile })}`, null);
   }
 
-  // Add these methods to your existing data.service.ts
-
-  // Get all repositories for a topic (excluding current one)
-  getRepositoriesForTopic(domain: string, topic: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/repositories/${domain}/${topic}`);
+  // Sibling leaf repositories under a parent path (candidates for a move-question target)
+  getSiblingRepositories(parentPath: string[]): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/repositories/${this.pathSegment(parentPath)}`);
   }
 
-  // Move questions from one repository to another
+  // Move questions (possibly from multiple source files) into a target repository
   moveQuestions(
-    sourceDomain: string,
-    sourceTopic: string,
-    sourceRepository: string,
-    questionIndices: number[],
-    targetRepository: string
+    items: { sourcePath: string[]; sourceIndex: number }[],
+    targetPath: string[]
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/move-question`, {
-      sourceDomain,
-      sourceTopic,
-      sourceRepository,
-      questionIndices,
-      targetRepository
+      items,
+      targetPath
     });
   }
 
-  // Add this method to data.service.ts
-
-  // Delete question from repository
   deleteQuestion(
-    domain: string,
-    topic: string,
-    repository: string,
-    questionIndex: number
+    sourcePath: string[],
+    sourceIndex: number
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/delete-question`, {
-      domain,
-      topic,
-      repository,
-      questionIndex
+      sourcePath,
+      sourceIndex
     });
   }
 

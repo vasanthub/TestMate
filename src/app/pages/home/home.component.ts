@@ -4,35 +4,30 @@ import { HttpClient } from '@angular/common/http';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
-import { DomainStructure } from '../../models/question.model';
+import { RepositoryNode, RepositorySummary } from '../../models/question.model';
+import { RepositoryTreeNodeComponent } from '../../components/repository-tree-node/repository-tree-node.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, RepositoryTreeNodeComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit {
   activeTab: 'predefined' | 'ai' = 'predefined';
-  domainStructure: DomainStructure = {};
-  domains: string[] = [];
+  tree: RepositoryNode[] = [];
   loading = true;
   aiTopic: string = '';
   isLoadingAI: boolean = false;
 
-  expandedDomains: { [key: string]: boolean } = {};
-  expandedTopics: { [key: string]: boolean } = {};
+  expandedPaths: Set<string> = new Set<string>();
+  visiblePaths: Set<string> | null = null;
 
   searchQuery: string = '';
-  filteredDomains: string[] = [];
-  filteredTopics: { [domain: string]: string[] } = {};
-  filteredRepos: { [key: string]: string[] } = {};
-
-  repositoryStatuses: { [key: string]: string } = {};
-  repositorySummaries: { [key: string]: any } = {};
   statusFilter: string = 'all';
-  openStatusMenu: string | null = null;
+
+  repositorySummaries: { [key: string]: RepositorySummary } = {};
 
   profileName: string = "default";
 
@@ -44,27 +39,20 @@ export class HomeComponent implements OnInit {
   ngOnInit(): void {
     this.profileName = this.dataService.getProfileName();
     this.loadStructure();
-    this.loadRepositoryStatuses();
     this.loadRepositorySummaries();
 
-    // Expand sections based on query params (from breadcrumbs)
+    // Expand ancestor sections based on a deep-link query param (from repository breadcrumbs)
     this.route.queryParams.subscribe(params => {
-      if (params['domain']) {
-        this.expandedDomains[params['domain']] = true;
-        if (params['topic']) {
-          const key = `${params['domain']}-${params['topic']}`;
-          this.expandedTopics[key] = true;
-        }
+      if (params['expandPath']) {
+        this.expandAncestors(params['expandPath']);
       }
     });
   }
 
   loadStructure(): void {
-    this.dataService.getDomainStructure().subscribe({
-      next: (structure) => {
-        this.domainStructure = structure;
-        this.domains = Object.keys(structure);
-        this.filteredDomains = [...this.domains];
+    this.dataService.getTree().subscribe({
+      next: (tree) => {
+        this.tree = tree;
         this.loading = false;
       },
       error: (err) => {
@@ -74,50 +62,31 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  loadRepositoryStatuses(): void {
-    this.dataService.getRepositoryStatuses(this.profileName).subscribe({
-      next: (statuses) => {
-        this.repositoryStatuses = statuses;
-      },
-      error: (err) => {
-        console.error('Error loading repository statuses:', err);
-      }
-    });
+  private parseAvgTimeToSeconds(avgTime: string): number {
+    let seconds = 0;
+    const mMatch = /(\d+)m/.exec(avgTime);
+    const sMatch = /(\d+)s/.exec(avgTime);
+    if (mMatch) seconds += parseInt(mMatch[1], 10) * 60;
+    if (sMatch) seconds += parseInt(sMatch[1], 10);
+    return seconds;
   }
 
   loadRepositorySummaries(): void {
     this.dataService.getRepositorySummaries(this.profileName).subscribe({
       next: (summaries) => {
-        // Pre-process summaries to calculate timeToComplete and format avgTime
         Object.keys(summaries).forEach(key => {
-          const summary = summaries[key];
-          if (summary && summary.avgTime && summary.avgTime !== '00:00' && summary.attempted > 0) {
-            // Parse avgTime (expected format mm:ss or m s)
-            let avgSeconds = 0;
-            const hhmmssMatch = summary.avgTime.match(/^(\d{1,2}):(\d{2})$/);
-            if (hhmmssMatch) {
-              const m = parseInt(hhmmssMatch[1], 10);
-              const s = parseInt(hhmmssMatch[2], 10);
-              avgSeconds = m * 60 + s;
-              summary.formattedAvgTime = m > 0 ? `${m}m ${s}s` : `${s}s`;
-            } else {
-              const mMatch = summary.avgTime.match(/(\d+)m/);
-              const sMatch = summary.avgTime.match(/(\d+)s/);
-              if (mMatch) avgSeconds += parseInt(mMatch[1], 10) * 60;
-              if (sMatch) avgSeconds += parseInt(sMatch[1], 10);
-              summary.formattedAvgTime = summary.avgTime;
-            }
+          const summary: RepositorySummary = summaries[key];
+          if (summary && summary.avgTime && summary.attempted > 0) {
+            summary.formattedAvgTime = summary.avgTime;
+            const avgSeconds = this.parseAvgTimeToSeconds(summary.avgTime);
 
-            // Calculate time to complete
-            if (summary.attempted < summary.totalQuestions && avgSeconds > 0) {
-              const remaining = summary.totalQuestions - summary.attempted;
-              const totalRemainingSeconds = remaining * avgSeconds;
-
+            if (summary.remaining > 0 && avgSeconds > 0) {
+              const totalRemainingSeconds = summary.remaining * avgSeconds;
               const h = Math.floor(totalRemainingSeconds / 3600);
               const m = Math.floor((totalRemainingSeconds % 3600) / 60);
               const s = totalRemainingSeconds % 60;
 
-              let timeParts = [];
+              let timeParts: string[] = [];
               if (h > 0) {
                 timeParts.push(`${h}h`);
                 if (m > 0) timeParts.push(`${m}m`);
@@ -130,6 +99,7 @@ export class HomeComponent implements OnInit {
           }
         });
         this.repositorySummaries = summaries;
+        this.recomputeVisibility();
       },
       error: (err) => {
         console.error('Error loading repository summaries:', err);
@@ -137,29 +107,30 @@ export class HomeComponent implements OnInit {
     });
   }
 
-
-  practiceIncorrect(domain: string, topic: string, repo: string): void {
-    this.router.navigate(['/practice', domain, topic, repo], {
+  practiceIncorrect(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path], {
       queryParams: { practiceIncorrectOnly: 'true' }
     });
   }
 
-  navigateToPractice(domain: string, topic: string, repo: string): void {
-    this.router.navigate(['/practice', domain, topic, repo]);
+  navigateToPractice(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path]);
   }
 
-  clearProgress(domain: string, topic: string, repo: string, event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
+  toggleExpand(key: string): void {
+    if (this.expandedPaths.has(key)) {
+      this.expandedPaths.delete(key);
+    } else {
+      this.expandedPaths.add(key);
+    }
+  }
 
-    if (confirm(`Clear all practice progress for "${repo}"?`)) {
-      this.dataService.deletePracticeAttempts(domain, topic, repo, this.profileName).subscribe({
+  clearProgress(payload: { node: RepositoryNode; event: Event }): void {
+    const node = payload.node;
+    if (confirm(`Clear all practice progress for "${node.name}"?`)) {
+      this.dataService.deletePracticeAttempts(node.path, this.profileName).subscribe({
         next: () => {
-          // Clear local cache if exists
-          const cacheKey = `${topic}_${repo}`;
-          localStorage.removeItem(cacheKey);
-
-          // Reload summaries to update UI
+          localStorage.removeItem(node.path.join('|'));
           this.loadRepositorySummaries();
         },
         error: (err) => {
@@ -170,269 +141,101 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  getRepositoryStatus(domain: string, topic: string, repository: string): string {
-    const key = `${domain}|${topic}|${repository}`;
-    return this.repositoryStatuses[key] || 'not_started';
-  }
-
-  getRepositorySummary(domain: string, topic: string, repository: string): any {
-    const key = `${domain}|${topic}|${repository}`;
-    let summary = this.repositorySummaries[key];
-
-    if (!summary) {
-      // Case-insensitive fallback
-      const lowerKey = key.toLowerCase();
-      const foundKey = Object.keys(this.repositorySummaries).find(k => k.toLowerCase() === lowerKey);
-      if (foundKey) summary = this.repositorySummaries[foundKey];
-    }
-
-    return summary || null;
-  }
-
-  updateRepositoryStatus(domain: string, topic: string, repository: string, status: string, event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    this.dataService.updateRepositoryStatus(domain, topic, repository, status, this.profileName).subscribe({
-      next: () => {
-        const key = `${domain}|${topic}|${repository}`;
-        this.repositoryStatuses[key] = status;
-        this.openStatusMenu = null;
-      },
-      error: (err) => {
-        console.error('Error updating repository status:', err);
-      }
-    });
-  }
-
-  toggleStatusMenu(domain: string, topic: string, repository: string, event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const key = `${domain}|${topic}|${repository}`;
-    if (this.openStatusMenu === key) {
-      this.openStatusMenu = null;
-    } else {
-      this.openStatusMenu = key;
-    }
-  }
-
-  isStatusMenuOpen(domain: string, topic: string, repository: string): boolean {
-    return this.openStatusMenu === `${domain}|${topic}|${repository}`;
-  }
-
   switchTab(tab: 'predefined' | 'ai'): void {
     this.activeTab = tab;
   }
 
-  toggleDomain(domain: string): void {
-    this.expandedDomains[domain] = !this.expandedDomains[domain];
-  }
-
-  isDomainExpanded(domain: string): boolean {
-    return this.expandedDomains[domain] === true;
-  }
-
-  toggleTopic(domain: string, topic: string): void {
-    const key = `${domain}-${topic}`;
-    this.expandedTopics[key] = !this.expandedTopics[key];
-  }
-
-  isTopicExpanded(domain: string, topic: string): boolean {
-    const key = `${domain}-${topic}`;
-    return this.expandedTopics[key] === true;
-  }
-
   expandAll(): void {
-    this.domains.forEach(domain => {
-      this.expandedDomains[domain] = true;
-      this.getTopics(domain).forEach(topic => {
-        const key = `${domain}-${topic}`;
-        this.expandedTopics[key] = true;
+    const collect = (nodes: RepositoryNode[]) => {
+      nodes.forEach(n => {
+        if (n.hasChildren) {
+          this.expandedPaths.add(n.path.join('|'));
+          collect(n.children);
+        }
       });
-    });
+    };
+    collect(this.tree);
   }
 
   collapseAll(): void {
-    this.expandedDomains = {};
-    this.expandedTopics = {};
+    this.expandedPaths.clear();
   }
 
   onSearch(): void {
-    const query = this.searchQuery.toLowerCase().trim();
-
-    if (!query) {
-      this.applyFilters();
-      return;
-    }
-
-    this.filteredDomains = [];
-    this.filteredTopics = {};
-    this.filteredRepos = {};
-
-    this.domains.forEach(domain => {
-      const topics = this.getTopics(domain);
-      const matchingTopics: string[] = [];
-      let domainMatches = domain.toLowerCase().includes(query);
-
-      topics.forEach(topic => {
-        const repos = this.getRepositories(domain, topic);
-        const matchingRepos = repos.filter(repo =>
-          repo.toLowerCase().includes(query)
-        );
-
-        const topicMatches = topic.toLowerCase().includes(query);
-
-        if (topicMatches || matchingRepos.length > 0 || domainMatches) {
-          matchingTopics.push(topic);
-          const key = `${domain}-${topic}`;
-          this.filteredRepos[key] = matchingRepos.length > 0 ? matchingRepos : repos;
-
-          if (query) {
-            this.expandedDomains[domain] = true;
-            this.expandedTopics[key] = true;
-          }
-        }
-      });
-
-      if (domainMatches || matchingTopics.length > 0) {
-        this.filteredDomains.push(domain);
-        this.filteredTopics[domain] = matchingTopics;
-      }
-    });
-
-    this.applyStatusFilter();
+    this.recomputeVisibility();
   }
 
   clearSearch(): void {
     this.searchQuery = '';
-    this.onSearch();
+    this.recomputeVisibility();
   }
 
   onStatusFilterChange(): void {
-    this.applyFilters();
+    this.recomputeVisibility();
   }
 
-  applyFilters(): void {
-    const query = this.searchQuery.toLowerCase().trim();
+  private getEffectiveStatus(node: RepositoryNode): string {
+    const key = node.path.join('|');
+    return this.repositorySummaries[key]?.status || 'not_started';
+  }
 
-    this.filteredDomains = [];
-    this.filteredTopics = {};
-    this.filteredRepos = {};
+  private nodeMatchesSelf(node: RepositoryNode, query: string): boolean {
+    const nameMatches = !query || node.name.toLowerCase().includes(query);
+    const statusMatches = this.statusFilter === 'all' || this.getEffectiveStatus(node) === this.statusFilter;
+    return nameMatches && statusMatches;
+  }
 
-    this.domains.forEach(domain => {
-      const topics = this.getTopics(domain);
-      const matchingTopics: string[] = [];
-      let domainMatches = !query || domain.toLowerCase().includes(query);
-
-      topics.forEach(topic => {
-        const repos = this.getRepositories(domain, topic);
-        let matchingRepos = repos;
-
-        if (query) {
-          matchingRepos = repos.filter(repo =>
-            repo.toLowerCase().includes(query)
-          );
-        }
-
-        if (this.statusFilter !== 'all') {
-          matchingRepos = matchingRepos.filter(repo =>
-            this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
-          );
-        }
-
-        const topicMatches = !query || topic.toLowerCase().includes(query);
-
-        if ((topicMatches || matchingRepos.length > 0 || domainMatches) &&
-          (this.statusFilter === 'all' || matchingRepos.length > 0)) {
-          matchingTopics.push(topic);
-          const key = `${domain}-${topic}`;
-          this.filteredRepos[key] = matchingRepos;
-
-          if (query || this.statusFilter !== 'all') {
-            this.expandedDomains[domain] = true;
-            this.expandedTopics[key] = true;
-          }
-        }
-      });
-
-      if ((domainMatches || matchingTopics.length > 0) &&
-        (this.statusFilter === 'all' || matchingTopics.length > 0)) {
-        this.filteredDomains.push(domain);
-        this.filteredTopics[domain] = matchingTopics;
-      }
+  private addAllDescendants(node: RepositoryNode, visible: Set<string>): void {
+    node.children.forEach(child => {
+      visible.add(child.path.join('|'));
+      this.addAllDescendants(child, visible);
     });
   }
 
-  applyStatusFilter(): void {
-    if (this.statusFilter === 'all') return;
-
-    const newFilteredDomains: string[] = [];
-    const newFilteredTopics: { [domain: string]: string[] } = {};
-    const newFilteredRepos: { [key: string]: string[] } = {};
-
-    this.filteredDomains.forEach(domain => {
-      const topics = this.filteredTopics[domain] || this.getTopics(domain);
-      const matchingTopics: string[] = [];
-
-      topics.forEach(topic => {
-        const key = `${domain}-${topic}`;
-        const repos = this.filteredRepos[key] || this.getRepositories(domain, topic);
-        const matchingRepos = repos.filter(repo =>
-          this.getRepositoryStatus(domain, topic, repo) === this.statusFilter
-        );
-
-        if (matchingRepos.length > 0) {
-          matchingTopics.push(topic);
-          newFilteredRepos[key] = matchingRepos;
-        }
-      });
-
-      if (matchingTopics.length > 0) {
-        newFilteredDomains.push(domain);
-        newFilteredTopics[domain] = matchingTopics;
-      }
+  // Returns true if this node (or any descendant) is visible. When a node matches
+  // by itself, its whole subtree is revealed; when only a descendant matches, only
+  // the path down to that descendant is revealed (ancestors shown for context).
+  private collectVisible(node: RepositoryNode, query: string, visible: Set<string>, expandTargets: Set<string>): boolean {
+    const key = node.path.join('|');
+    let anyDescendantVisible = false;
+    node.children.forEach(child => {
+      if (this.collectVisible(child, query, visible, expandTargets)) anyDescendantVisible = true;
     });
 
-    this.filteredDomains = newFilteredDomains;
-    this.filteredTopics = newFilteredTopics;
-    this.filteredRepos = newFilteredRepos;
-  }
+    const selfMatches = this.nodeMatchesSelf(node, query);
 
-  getFilteredDomains(): string[] {
-    return this.searchQuery || this.statusFilter !== 'all' ? this.filteredDomains : this.domains;
-  }
-
-  getFilteredTopics(domain: string): string[] {
-    if ((this.searchQuery || this.statusFilter !== 'all') && this.filteredTopics[domain]) {
-      return this.filteredTopics[domain];
+    if (selfMatches || anyDescendantVisible) {
+      visible.add(key);
+      if (selfMatches) this.addAllDescendants(node, visible);
+      if (anyDescendantVisible) expandTargets.add(key);
+      return true;
     }
-    return this.getTopics(domain);
+    return false;
   }
 
-  getFilteredRepositories(domain: string, topic: string): string[] {
-    const key = `${domain}-${topic}`;
-    if ((this.searchQuery || this.statusFilter !== 'all') && this.filteredRepos[key]) {
-      return this.filteredRepos[key];
+  recomputeVisibility(): void {
+    const query = this.searchQuery.trim().toLowerCase();
+    const activeFilter = !!query || this.statusFilter !== 'all';
+
+    if (!activeFilter) {
+      this.visiblePaths = null;
+      return;
     }
-    return this.getRepositories(domain, topic);
+
+    const visible = new Set<string>();
+    const expandTargets = new Set<string>();
+    this.tree.forEach(root => this.collectVisible(root, query, visible, expandTargets));
+    this.visiblePaths = visible;
+    expandTargets.forEach(key => this.expandedPaths.add(key));
   }
 
-  highlightMatch(text: string): string {
-    if (!this.searchQuery) return text;
-
-    const query = this.searchQuery.trim();
-    const regex = new RegExp(`(${query})`, 'gi');
-    return text.replace(regex, '<mark>$1</mark>');
-  }
-
-  getTopics(domain: string): string[] {
-    return Object.keys(this.domainStructure[domain] || {});
-  }
-
-  getRepositories(domain: string, topic: string): string[] {
-    const repos = this.domainStructure[domain]?.[topic] || [];
-    return repos.sort((a, b) => a.localeCompare(b));
+  private expandAncestors(joinedPath: string): void {
+    const segments = joinedPath.split('|').filter(s => !!s);
+    const acc: string[] = [];
+    segments.forEach(seg => {
+      acc.push(seg);
+      this.expandedPaths.add(acc.join('|'));
+    });
   }
 
   startAITest(): void {
@@ -445,18 +248,15 @@ export class HomeComponent implements OnInit {
     this.dataService.generateMCQs(this.aiTopic).subscribe({
       next: (mcqs) => {
         this.isLoadingAI = false;
+        const path = ['AI-Generated', this.aiTopic, 'AI-Generated'];
         const testData = {
           questions: mcqs,
           testName: `AI Test: ${this.aiTopic}`,
-          domain: 'AI-Generated',
-          topic: this.aiTopic,
-          repository: 'AI-Generated',
+          path,
           mode: 'practice',
           isAIGenerated: true
         };
-        console.log(testData);
-        this.router.navigate(['/practice', testData.domain, testData.topic, testData.repository], { state: { testData } });
-
+        this.router.navigate(['/practice', ...path], { state: { testData } });
       },
       error: (error) => {
         this.isLoadingAI = false;

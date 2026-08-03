@@ -25,7 +25,12 @@
       <div class="tree-col text-center total-value" [class.total-value-active]="isExpanded"
         [class.total-value-clickable]="s.canPractice" (click)="onQuestionsClick($event)"
         [title]="s.canPractice ? 'Start practice' : ''">{{ s.totalQuestions }}</div>
-      <div class="tree-col text-center">{{ s.attempted || '' }}</div>
+      <div class="tree-col text-center">
+        <a *ngIf="s.attempted > 0" (click)="onPracticeAttempted($event)" class="cell-link cursor-pointer"
+          title="Review Attempted Questions">
+          {{ s.attempted }}
+        </a>
+      </div>
       <div class="tree-col text-center">
         <div class="progress-cell" *ngIf="s.attempted > 0">
           <div class="mini-bar">
@@ -35,9 +40,15 @@
           {{ s.completionPercent | number:'1.0-0' }}%
         </div>
       </div>
-      <div class="tree-col text-center text-success-colored">{{ s.correct || '' }}</div>
       <div class="tree-col text-center">
-        <a *ngIf="s.incorrect > 0" (click)="onPracticeIncorrect($event)" class="text-danger-colored cursor-pointer"
+        <a *ngIf="s.correct > 0" (click)="onPracticeCorrect($event)" class="cell-link text-success-colored cursor-pointer"
+          title="Review Correct Questions">
+          {{ s.correct }}
+        </a>
+        <span *ngIf="s.correct === 0 && s.attempted > 0" class="text-success-colored">{{ s.correct }}</span>
+      </div>
+      <div class="tree-col text-center">
+        <a *ngIf="s.incorrect > 0" (click)="onPracticeIncorrect($event)" class="cell-link text-danger-colored cursor-pointer"
           title="Practice Incorrect Only">
           {{ s.incorrect }}
         </a>
@@ -68,7 +79,8 @@
     <app-repository-tree-node *ngFor="let child of node.children" [node]="child" [depth]="depth + 1"
       [expandedPaths]="expandedPaths" [summaries]="summaries" [visiblePaths]="visiblePaths"
       [searchQuery]="searchQuery" (toggleExpand)="toggleExpand.emit($event)" (navigate)="navigate.emit($event)"
-      (practiceIncorrect)="practiceIncorrect.emit($event)" (clearProgress)="clearProgress.emit($event)">
+      (practiceIncorrect)="practiceIncorrect.emit($event)" (practiceAttempted)="practiceAttempted.emit($event)"
+      (practiceCorrect)="practiceCorrect.emit($event)" (clearProgress)="clearProgress.emit($event)">
     </app-repository-tree-node>
   </div>
 </ng-container>

@@ -4,9 +4,11 @@ import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { LatexService } from '../../services/latex.service';
-import { Question, QuestionAttempt, TestInstance } from '../../models/question.model';
+import { Question, QuestionAttempt, TestInstance, SiblingRepository } from '../../models/question.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { environment } from '../../../environments/environment';
+import { Observable, forkJoin, of } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-test',
@@ -20,6 +22,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('timerText', { static: false }) timerText!: ElementRef<HTMLDivElement>;
 
   path: string[] = [];
+  repositoryId: string = '';
   isPractice: boolean = false;
 
   questions: Question[] = [];
@@ -55,14 +58,16 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   userAnswers: (number[] | string)[] = [];
 
   practiceIncorrectOnly: boolean = false;
+  practiceAttemptedOnly: boolean = false;
+  practiceCorrectOnly: boolean = false;
 
   hideAnswer: boolean = true;
 
   // Move / Delete properties
   showMoveQuestionDialog: boolean = false;
-  availableRepositories: string[] = [];
+  availableRepositories: SiblingRepository[] = [];
   moveTargetParentPath: string[] = [];
-  selectedTargetRepository: string = '';
+  selectedTargetRepositoryId: string = '';
   isMovingQuestion: boolean = false;
   showDeleteQuestionDialog: boolean = false;
   isDeletingQuestion: boolean = false;
@@ -117,6 +122,13 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
       if (this.path.length > 0) {
         localStorage.setItem('selectedRepositoryPath', JSON.stringify(this.path));
+        // Needed for saveAsTestInstance() (Test mode results reference the practiced
+        // node's own id); the rest of the load/save flow addresses by each question's
+        // own __sourceId, so nothing else here needs to wait on this resolving.
+        this.dataService.resolveRepositoryId(this.path).subscribe({
+          next: ({ id }) => { this.repositoryId = id; },
+          error: (err) => console.error('Error resolving repository id:', err)
+        });
       }
     });
 
@@ -128,6 +140,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
       this.practiceIncorrectOnly = params['practiceIncorrectOnly'] === 'true';
+      this.practiceAttemptedOnly = params['practiceAttemptedOnly'] === 'true';
+      this.practiceCorrectOnly = params['practiceCorrectOnly'] === 'true';
 
       this.hideAnswer = params['hideAnswer'] === 'true';
 
@@ -250,9 +264,9 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     event.stopPropagation();
 
     const question = this.questions[questionIndex];
-    if (!question?.__sourcePath || question.__sourceIndex === undefined) return;
+    if (!question?.__sourceId || question.__sourceIndex === undefined) return;
 
-    this.dataService.updateQuestionImageUrl(question.__sourcePath, question.__sourceIndex, imageUrl).subscribe({
+    this.dataService.updateQuestionImageUrl(question.__sourceId, question.__sourceIndex, imageUrl).subscribe({
       next: () => {
         console.log(`Image URL updated successfully for question at index ${questionIndex}`);
       },
@@ -272,11 +286,11 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     event.stopPropagation();
 
     const question = this.questions[questionIndex];
-    if (!question?.__sourcePath || question.__sourceIndex === undefined) {
+    if (!question?.__sourceId || question.__sourceIndex === undefined) {
       alert('Unable to determine the source repository for this question');
       return;
     }
-    const sourcePath = question.__sourcePath;
+    const sourceId = question.__sourceId;
     const sourceIndex = question.__sourceIndex;
 
     // Prompt user for image name
@@ -303,7 +317,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
       clipboardItem.getType(imageType).then((blob) => {
         this.dataService.uploadImageFromClipboard(
-          sourcePath,
+          sourceId,
           sourceIndex,
           blob,
           imageName,
@@ -328,11 +342,46 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
 
+  // Practice attempts are always stored per physical source file (the same file a question's
+  // __sourcePath/__sourceIndex point to), never under an aggregate/parent node's own path -
+  // there is no such file for a node that spans multiple descendants. To load a session's
+  // attempts for ANY node (leaf or aggregate), fetch each distinct source file's own attempts
+  // and reassemble them in aggregate order, defaulting to a fresh "not yet attempted" entry
+  // wherever a source file has no recorded attempt for that question.
+  private fetchAggregatedAttempts(questions: Question[]): Observable<QuestionAttempt[]> {
+    const sourceIds = new Set<string>();
+    questions.forEach(q => {
+      if (q.__sourceId) sourceIds.add(q.__sourceId);
+    });
+
+    if (sourceIds.size === 0) return of([]);
+
+    const ids = Array.from(sourceIds);
+    const calls = ids.map(id => this.dataService.getPracticeAttempts(id));
+
+    return forkJoin(calls).pipe(
+      map((resultsPerSource: QuestionAttempt[][]) => {
+        const bySource = new Map<string, QuestionAttempt[]>();
+        ids.forEach((id, i) => bySource.set(id, resultsPerSource[i] || []));
+
+        return questions.map((q, index) => {
+          const sourceAttempts = q.__sourceId ? (bySource.get(q.__sourceId) || []) : [];
+          const sourceIndex = q.__sourceIndex ?? 0;
+          const existing = sourceAttempts[sourceIndex];
+          return existing
+            ? { ...existing, question_index: index }
+            : { question_index: index, correct: false, skipped: true, incorrectPreviousAttempt: false };
+        });
+      })
+    );
+  }
+
   loadQuestions(start?: number | null, end?: number | null): void {
     this.dataService.getRepository(this.path).subscribe({
       next: (aggregated) => {
         const allQuestions: Question[] = aggregated.map(a => ({
           ...a.question,
+          __sourceId: a.sourceId,
           __sourcePath: a.sourcePath,
           __sourceIndex: a.sourceIndex
         }));
@@ -340,7 +389,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         const filterQuestions = this.route.snapshot.queryParams['filterQuestions'];
 
         // Load practice attempts from server
-        this.dataService.getPracticeAttempts(this.path).subscribe({
+        this.fetchAggregatedAttempts(allQuestions).subscribe({
           next: (serverAttempts) => {
             console.log("serverAttempts loaded");
             console.log(serverAttempts);
@@ -351,6 +400,40 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
                 .map((a: QuestionAttempt) => a.question_index);
 
               this.questions = incorrectIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
+
+              // Create FRESH attempts for this session (temporary, not saved)
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false,
+                answered: undefined,
+                time_taken: undefined
+              }));
+            }
+            else if (this.practiceAttemptedOnly && serverAttempts && serverAttempts.length > 0) {
+              const attemptedIndices = serverAttempts
+                .filter((a: QuestionAttempt) => !a.skipped)
+                .map((a: QuestionAttempt) => a.question_index);
+
+              this.questions = attemptedIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
+
+              // Create FRESH attempts for this session (temporary, not saved)
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false,
+                answered: undefined,
+                time_taken: undefined
+              }));
+            }
+            else if (this.practiceCorrectOnly && serverAttempts && serverAttempts.length > 0) {
+              const correctIndices = serverAttempts
+                .filter((a: QuestionAttempt) => !a.skipped && a.correct)
+                .map((a: QuestionAttempt) => a.question_index);
+
+              this.questions = correctIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
 
               // Create FRESH attempts for this session (temporary, not saved)
               this.attempts = this.questions.map((_, index) => ({
@@ -373,7 +456,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
               this.questions = allQuestions;
             }
 
-            if (!this.practiceIncorrectOnly) {
+            if (!this.practiceIncorrectOnly && !this.practiceAttemptedOnly && !this.practiceCorrectOnly) {
               if (serverAttempts && serverAttempts.length > 0) {
                 this.attempts = serverAttempts;
                 if (this.attempts.length < this.questions.length) {
@@ -535,6 +618,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   initializeAnswer(): void {
+    window.scrollTo(0, 0);
     this.questionStartTime = Date.now();
     const question = this.questions[this.currentIndex];
 
@@ -819,14 +903,40 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveProgress(): void {
-    if (this.isAIGenerated || this.practiceIncorrectOnly) return;
+    if (this.isAIGenerated || this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly) return;
 
     const profileName = this.dataService.getProfileName();
-    this.dataService.savePracticeAttempts(
-      this.path,
-      profileName,
-      this.attempts
-    ).subscribe({
+
+    // Attempts must be written back to each question's own source file (never to the
+    // practiced node's own id, which may be an aggregate with no file of its own) - group
+    // this session's attempts by source id, remap to that file's local question index, and
+    // merge into whatever that file already had recorded so untouched questions aren't lost.
+    const groups = new Map<string, { sourceId: string; items: { sourceIndex: number; attempt: QuestionAttempt }[] }>();
+    this.questions.forEach((q, i) => {
+      if (!q.__sourceId || q.__sourceIndex === undefined) return;
+      if (!groups.has(q.__sourceId)) groups.set(q.__sourceId, { sourceId: q.__sourceId, items: [] });
+      groups.get(q.__sourceId)!.items.push({ sourceIndex: q.__sourceIndex, attempt: this.attempts[i] });
+    });
+
+    if (groups.size === 0) return;
+
+    const saveOps = Array.from(groups.values()).map(group =>
+      this.dataService.getPracticeAttempts(group.sourceId).pipe(
+        switchMap((existing: QuestionAttempt[]) => {
+          const maxIndex = Math.max(existing.length - 1, ...group.items.map(i => i.sourceIndex));
+          const merged: QuestionAttempt[] = [];
+          for (let idx = 0; idx <= maxIndex; idx++) {
+            merged[idx] = existing[idx] || { question_index: idx, correct: false, skipped: true, incorrectPreviousAttempt: false };
+          }
+          group.items.forEach(({ sourceIndex, attempt }) => {
+            merged[sourceIndex] = { ...attempt, question_index: sourceIndex };
+          });
+          return this.dataService.savePracticeAttempts(group.sourceId, profileName, merged);
+        })
+      )
+    );
+
+    forkJoin(saveOps).subscribe({
       next: () => {
         console.log('Progress auto-saved to server');
         localStorage.setItem(this.path.join('|'), JSON.stringify(this.attempts));
@@ -897,7 +1007,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveAsTestInstance(): void {
-    if (this.practiceIncorrectOnly) return;
+    if (this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly) return;
     let testName = `${this.repositoryName} - ${new Date().toLocaleDateString()}`;
 
     if (this.parentTestId && this.retestType) {
@@ -907,7 +1017,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     const testInstance = {
       test_id: this.dataService.generateTestId(),
       test_name: testName,
-      path: this.path,
+      repository_id: this.repositoryId,
       parent_test: this.parentTestId,
       retest_type: this.retestType as any,
       created_on: new Date().toISOString(),
@@ -1026,7 +1136,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
   closeMoveQuestionDialog(): void {
     this.showMoveQuestionDialog = false;
-    this.selectedTargetRepository = '';
+    this.selectedTargetRepositoryId = '';
   }
 
   loadAvailableRepositories(): void {
@@ -1034,14 +1144,16 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       ? Math.min(...Array.from(this.selectedQuestionIndices))
       : this.currentIndex;
     const referenceQuestion = this.questions[referenceIndex];
+    // The sibling picker is a navigation helper (lists files in a folder), so it still
+    // works off __sourcePath - only the eventual move operation itself is id-addressed.
     const sourcePath = referenceQuestion?.__sourcePath || this.path;
     this.moveTargetParentPath = sourcePath.slice(0, -1);
-    const currentName = sourcePath[sourcePath.length - 1];
+    const currentId = referenceQuestion?.__sourceId;
 
     this.dataService.getSiblingRepositories(this.moveTargetParentPath).subscribe({
       next: (repositories) => {
         // Filter out the current repository
-        this.availableRepositories = repositories.filter(repo => repo !== currentName);
+        this.availableRepositories = repositories.filter(repo => repo.id !== currentId);
       },
       error: (err) => {
         console.error('Error loading repositories:', err);
@@ -1051,7 +1163,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   moveSelectedQuestions(): void {
-    if (!this.selectedTargetRepository) {
+    if (!this.selectedTargetRepositoryId) {
       alert('Please select a target repository');
       return;
     }
@@ -1061,9 +1173,10 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       ? Array.from(this.selectedQuestionIndices).sort((a, b) => a - b)
       : [this.currentIndex];
 
+    const targetName = this.availableRepositories.find(r => r.id === this.selectedTargetRepositoryId)?.name || 'the selected repository';
     const confirmMessage = indicesToMove.length === 1
-      ? `Are you sure you want to move this question to "${this.selectedTargetRepository}"?`
-      : `Are you sure you want to move ${indicesToMove.length} selected questions to "${this.selectedTargetRepository}"?`;
+      ? `Are you sure you want to move this question to "${targetName}"?`
+      : `Are you sure you want to move ${indicesToMove.length} selected questions to "${targetName}"?`;
 
     if (!confirm(confirmMessage)) return;
 
@@ -1071,12 +1184,10 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const items = indicesToMove
       .map(i => this.questions[i])
-      .filter(q => q && q.__sourcePath && q.__sourceIndex !== undefined)
-      .map(q => ({ sourcePath: q.__sourcePath!, sourceIndex: q.__sourceIndex! }));
+      .filter(q => q && q.__sourceId && q.__sourceIndex !== undefined)
+      .map(q => ({ sourceId: q.__sourceId!, sourceIndex: q.__sourceIndex! }));
 
-    const targetPath = [...this.moveTargetParentPath, this.selectedTargetRepository];
-
-    this.dataService.moveQuestions(items, targetPath).subscribe({
+    this.dataService.moveQuestions(items, this.selectedTargetRepositoryId).subscribe({
       next: () => {
         this.closeMoveQuestionDialog();
         this.selectedQuestionIndices.clear();
@@ -1125,6 +1236,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       next: (aggregated) => {
         this.questions = aggregated.map(a => ({
           ...a.question,
+          __sourceId: a.sourceId,
           __sourcePath: a.sourcePath,
           __sourceIndex: a.sourceIndex
         }));
@@ -1135,7 +1247,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         // Reinitialize attempts by fetching latest from server (to keep markings correct after move/delete)
-        this.dataService.getPracticeAttempts(this.path).subscribe({
+        this.fetchAggregatedAttempts(this.questions).subscribe({
           next: (serverAttempts) => {
             if (serverAttempts && serverAttempts.length > 0) {
               this.attempts = serverAttempts;
@@ -1209,7 +1321,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     const question = this.currentQuestion;
-    if (!question.__sourcePath || question.__sourceIndex === undefined) {
+    if (!question.__sourceId || question.__sourceIndex === undefined) {
       alert('Unable to determine the source repository for this question');
       return;
     }
@@ -1217,7 +1329,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isDeletingQuestion = true;
 
     this.dataService.deleteQuestion(
-      question.__sourcePath,
+      question.__sourceId,
       question.__sourceIndex
     ).subscribe({
       next: () => {

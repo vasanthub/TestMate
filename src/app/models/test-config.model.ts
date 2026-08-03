@@ -1,7 +1,7 @@
 export interface TestConfiguration {
   config_id?: string;
   test_name: string;
-  path: string[];
+  repository_id: string;
   question_range: {
     start: number;
     end: number;

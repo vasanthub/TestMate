@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { Question, AggregatedQuestion, TestInstance, RepositoryNode, TestMateSettings } from '../models/question.model';
+import { Question, AggregatedQuestion, TestInstance, RepositoryNode, TestMateSettings, SiblingRepository } from '../models/question.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -26,12 +26,6 @@ export class DataService {
 
   private pathSegment(path: string[]): string {
     return path.map(p => encodeURIComponent(p)).join('/');
-  }
-
-  private pathQuery(path: string[], extra: { [key: string]: string } = {}): string {
-    const params = path.map(p => `path=${encodeURIComponent(p)}`);
-    Object.keys(extra).forEach(key => params.push(`${key}=${encodeURIComponent(extra[key])}`));
-    return params.join('&');
   }
 
   saveTestAttempt(attempt: any): Observable<any> {
@@ -62,6 +56,13 @@ export class DataService {
     return this.http.get<AggregatedQuestion[]>(`${this.apiUrl}/repository/${this.pathSegment(path)}`);
   }
 
+  // Resolves a URL path to the node's permanent, move-resilient repository id. Every
+  // page that only knows its path from the route (repository/test pages) must call this
+  // before talking to any id-keyed endpoint below.
+  resolveRepositoryId(path: string[]): Observable<{ id: string }> {
+    return this.http.get<{ id: string }>(`${this.apiUrl}/repository-id/${this.pathSegment(path)}`);
+  }
+
   generateMCQs(topic: string): Observable<Question[]> {
     return this.http.post<Question[]>(`${this.apiUrl}/reading/generate-mcqs`, {
       topic: topic
@@ -89,9 +90,9 @@ export class DataService {
     return this.http.post(`${this.apiUrl}/test-configurations`, config);
   }
 
-  getTestConfigurations(path: string[]): Observable<any[]> {
+  getTestConfigurations(repositoryId: string): Observable<any[]> {
     const profile = this.getProfileName();
-    return this.http.get<any[]>(`${this.apiUrl}/test-configurations?${this.pathQuery(path, { profileName: profile })}`);
+    return this.http.get<any[]>(`${this.apiUrl}/test-configurations?repositoryId=${encodeURIComponent(repositoryId)}&profileName=${encodeURIComponent(profile)}`);
   }
 
   deleteTestConfiguration(configId: string): Observable<any> {
@@ -195,35 +196,35 @@ export class DataService {
     return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/repository-status?profileName=${profileName}`);
   }
 
-  updateRepositoryStatus(path: string[], status: string, profileName: string = 'default'): Observable<any> {
+  updateRepositoryStatus(repositoryId: string, status: string, profileName: string = 'default'): Observable<any> {
     return this.http.post(`${this.apiUrl}/repository-status`, {
-      path,
+      repositoryId,
       status,
       profileName
     });
   }
 
   updateQuestionImageUrl(
-    sourcePath: string[],
+    sourceId: string,
     sourceIndex: number,
     imageUrl: string
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/question-image-url`, {
-      sourcePath,
+      sourceId,
       sourceIndex,
       imageUrl
     });
   }
 
   uploadImageFromClipboard(
-    sourcePath: string[],
+    sourceId: string,
     sourceIndex: number,
     imageBlob: Blob,
     imageName: string,
     imageIndex: number
   ): Observable<any> {
     const formData = new FormData();
-    sourcePath.forEach(segment => formData.append('sourcePath', segment));
+    formData.append('sourceId', sourceId);
     formData.append('sourceIndex', sourceIndex.toString());
     formData.append('imageName', imageName);
     formData.append('imageIndex', imageIndex.toString());
@@ -233,55 +234,55 @@ export class DataService {
   }
 
   savePracticeAttempts(
-    path: string[],
+    repositoryId: string,
     profileName: string,
     attempts: any[]
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/practice-attempts`, {
-      path,
+      repositoryId,
       profileName,
       attempts
     });
   }
 
   getPracticeAttempts(
-    path: string[],
+    repositoryId: string,
     profileName?: string
   ): Observable<any[]> {
     const profile = profileName || this.getProfileName();
-    return this.http.get<any[]>(`${this.apiUrl}/practice-attempts?${this.pathQuery(path, { profileName: profile })}`);
+    return this.http.get<any[]>(`${this.apiUrl}/practice-attempts?repositoryId=${encodeURIComponent(repositoryId)}&profileName=${encodeURIComponent(profile)}`);
   }
 
   deletePracticeAttempts(
-    path: string[],
+    repositoryId: string,
     profileName?: string
   ): Observable<any> {
     const profile = profileName || this.getProfileName();
-    return this.http.post(`${this.apiUrl}/practice-attempts/delete?${this.pathQuery(path, { profileName: profile })}`, null);
+    return this.http.post(`${this.apiUrl}/practice-attempts/delete?repositoryId=${encodeURIComponent(repositoryId)}&profileName=${encodeURIComponent(profile)}`, null);
   }
 
   // Sibling leaf repositories under a parent path (candidates for a move-question target)
-  getSiblingRepositories(parentPath: string[]): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/repositories/${this.pathSegment(parentPath)}`);
+  getSiblingRepositories(parentPath: string[]): Observable<SiblingRepository[]> {
+    return this.http.get<SiblingRepository[]>(`${this.apiUrl}/repositories/${this.pathSegment(parentPath)}`);
   }
 
   // Move questions (possibly from multiple source files) into a target repository
   moveQuestions(
-    items: { sourcePath: string[]; sourceIndex: number }[],
-    targetPath: string[]
+    items: { sourceId: string; sourceIndex: number }[],
+    targetId: string
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/move-question`, {
       items,
-      targetPath
+      targetId
     });
   }
 
   deleteQuestion(
-    sourcePath: string[],
+    sourceId: string,
     sourceIndex: number
   ): Observable<any> {
     return this.http.post(`${this.apiUrl}/delete-question`, {
-      sourcePath,
+      sourceId,
       sourceIndex
     });
   }

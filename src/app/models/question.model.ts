@@ -13,15 +13,18 @@ export interface Question {
   type: 'single' | 'multiple' | 'text';
 
   // Populated only when a question comes from an aggregated (recursive) fetch.
-  // Identifies the exact physical repository file + index it came from, so
-  // move/delete/image-edit operations can address it correctly even when a
-  // practice session spans multiple descendant repositories.
+  // __sourceId is the permanent, move-resilient identity of the physical file it came
+  // from - all writes (move/delete/image-edit) must address by __sourceId. __sourcePath
+  // is kept only for display and for deriving the move-question picker's parent folder;
+  // it must never be used as a storage key.
+  __sourceId?: string;
   __sourcePath?: string[];
   __sourceIndex?: number;
 }
 
 export interface AggregatedQuestion {
   question: Question;
+  sourceId: string;
   sourcePath: string[];
   sourceIndex: number;
 }
@@ -38,7 +41,7 @@ export interface QuestionAttempt {
 export interface TestInstance {
   test_id?: string;
   test_name: string;
-  path: string[];
+  repository_id: string;
   parent_test?: string;
   retest_type?: 'full_set' | 'incorrect_only' | 'skipped_only' | null;
   created_on: string;
@@ -56,9 +59,12 @@ export interface TestInstance {
 /**
  * A node in the recursive repository tree. A node can have its own questions
  * (hasOwnQuestions), child repository nodes (hasChildren), both, or neither.
- * Root-level nodes (path.length === 1) are "Subjects" - navigation only, never practicable.
+ * `id` is a permanent identity resolved from a sidecar file beside the node - it never
+ * changes even if the node is moved/renamed, which is what all persisted data (attempts,
+ * status, saved tests) is keyed by instead of `path`.
  */
 export interface RepositoryNode {
+  id: string;
   name: string;
   path: string[];
   hasOwnQuestions: boolean;
@@ -88,4 +94,9 @@ export interface RepositorySummary {
 
 export interface TestMateSettings {
   maxPracticeQuestions: number;
+}
+
+export interface SiblingRepository {
+  name: string;
+  id: string;
 }

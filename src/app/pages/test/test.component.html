@@ -1,4 +1,13 @@
 <div class="test-container" *ngIf="!loading && testStarted">
+  <div class="mobile-topbar">
+    <button class="mobile-back-btn" (click)="goToList()" aria-label="Back to repository">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </button>
+    <span class="mobile-topbar-title">{{ repositoryName }}</span>
+    <span *ngIf="!showResult" class="mobile-topbar-progress">{{ currentIndex + 1 }}/{{ questions.length }}</span>
+  </div>
   <div class="breadcrumb">
     <a routerLink="/">Home</a>
     <ng-container *ngFor="let crumb of ancestorLinks">
@@ -131,14 +140,8 @@
           <!-- Text Answer Action Buttons - Always visible before submission -->
           <div *ngIf="!isAnswerSubmitted ||  getQuestionStatus(currentIndex) === 'incorrectPreviousAttempt'"
             class="text-answer-actions">
-            <button class="btn btn-warning btn-sm" (click)="revealAnswer()"
+            <button class="btn btn-warning btn-sm btn-reveal-answer" (click)="revealAnswer()"
               *ngIf="!showFeedback || getQuestionStatus(currentIndex) === 'incorrectPreviousAttempt'">
-              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2" />
-                <path
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                  stroke-width="2" />
-              </svg>
               Reveal Answer
             </button>
           </div>
@@ -247,7 +250,6 @@
             <div *ngIf="selectedQuestionIndices.has(i)" class="selection-marker">✓</div>
           </button>
         </div>
-        <div class="grid-hint">Tip: Right-click to select multiple</div>
       </div>
 
       <div class="test-footer-centered">
@@ -404,11 +406,11 @@
 
       <div class="repository-selection">
         <label for="targetRepository">Select Target Repository:</label>
-        <select id="targetRepository" [(ngModel)]="selectedTargetRepository" class="repository-select"
+        <select id="targetRepository" [(ngModel)]="selectedTargetRepositoryId" class="repository-select"
           [disabled]="isMovingQuestion">
           <option value="">-- Choose a repository --</option>
-          <option *ngFor="let repo of availableRepositories" [value]="repo">
-            {{ repo }}
+          <option *ngFor="let repo of availableRepositories" [value]="repo.id">
+            {{ repo.name }}
           </option>
         </select>
       </div>
@@ -429,7 +431,7 @@
         Cancel
       </button>
       <button class="btn btn-primary" (click)="moveSelectedQuestions()"
-        [disabled]="!selectedTargetRepository || isMovingQuestion">
+        [disabled]="!selectedTargetRepositoryId || isMovingQuestion">
         <span *ngIf="!isMovingQuestion">Move {{ selectedQuestionIndices.size > 1 ? selectedQuestionIndices.size + '
           Questions' : 'Question' }}</span>
         <span *ngIf="isMovingQuestion">Moving...</span>

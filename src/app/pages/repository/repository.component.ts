@@ -15,6 +15,7 @@ import { TestConfiguration, TestAttempt } from '../../models/test-config.model';
 })
 export class RepositoryComponent implements OnInit {
   path: string[] = [];
+  repositoryId: string = '';
   repositoryName: string = '';
   questions: Question[] = [];
   loading = true;
@@ -65,8 +66,17 @@ export class RepositoryComponent implements OnInit {
 
       this.loading = true;
       this.loadQuestions();
-      this.loadSavedTests();
-      this.loadSummary();
+
+      this.dataService.resolveRepositoryId(this.path).subscribe({
+        next: ({ id }) => {
+          this.repositoryId = id;
+          this.loadSavedTests();
+          this.loadSummary();
+        },
+        error: (err) => {
+          console.error('Error resolving repository id:', err);
+        }
+      });
     });
   }
 
@@ -81,8 +91,7 @@ export class RepositoryComponent implements OnInit {
   loadSummary(): void {
     this.dataService.getRepositorySummaries(this.dataService.getProfileName()).subscribe({
       next: (summaries) => {
-        const key = this.path.join('|');
-        this.summary = summaries[key] || null;
+        this.summary = summaries[this.repositoryId] || null;
         this.canPractice = !!this.summary?.canPractice;
       },
       error: (err) => {
@@ -111,6 +120,7 @@ export class RepositoryComponent implements OnInit {
       next: (aggregated) => {
         this.questions = aggregated.map(a => ({
           ...a.question,
+          __sourceId: a.sourceId,
           __sourcePath: a.sourcePath,
           __sourceIndex: a.sourceIndex
         }));
@@ -126,7 +136,7 @@ export class RepositoryComponent implements OnInit {
   }
 
   loadSavedTests(): void {
-    this.dataService.getTestConfigurations(this.path).subscribe({
+    this.dataService.getTestConfigurations(this.repositoryId).subscribe({
       next: (tests) => {
         this.savedTests = tests;
       },
@@ -231,7 +241,7 @@ export class RepositoryComponent implements OnInit {
   saveTest(): void {
     const config: TestConfiguration = {
       test_name: this.testName,
-      path: this.path,
+      repository_id: this.repositoryId,
       question_range: {
         start: this.useRange ? this.rangeStart : 1,
         end: this.useRange ? this.rangeEnd : this.questions.length
@@ -304,7 +314,7 @@ export class RepositoryComponent implements OnInit {
   startPractice(): void {
     if (this.clearPreviousAttempts) {
       this.dataService.deletePracticeAttempts(
-        this.path,
+        this.repositoryId,
         this.dataService.getProfileName()
       ).subscribe({
         next: () => {

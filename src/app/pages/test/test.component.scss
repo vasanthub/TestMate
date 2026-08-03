@@ -180,7 +180,8 @@
 .question-text {
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--text-primary);
+  color: #33578f; // blueish-gray, sets the question apart from the (darker) answer text
+  font-weight: 500;
   margin-bottom: 1.5rem;
 }
 
@@ -232,16 +233,16 @@
 .option-label {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 1rem;
   cursor: pointer;
   width: 100%;
 
   input[type="radio"],
   input[type="checkbox"] {
-    margin-top: 0.25rem;
-    width: 1.25rem;
-    height: 1.25rem;
+    margin-top: 0.15rem;
+    width: 1.15rem;
+    height: 1.15rem;
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -355,6 +356,14 @@
 .btn-sm {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
+}
+
+// Two-class selector so this reliably outranks the generic `.btn { padding: 5px }`
+// reset in the <=1024px breakpoint below (same specificity would otherwise let
+// source order decide, and that rule comes later in the file).
+.text-answer-actions .btn-reveal-answer {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .btn-icon-sm {
@@ -806,16 +815,6 @@
       background-color: var(--primary-dark);
     }
   }
-}
-
-.grid-hint {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 1rem;
-  font-style: italic;
-  text-align: center;
-  border-top: 1px dashed var(--border-color);
-  padding-top: 0.5rem;
 }
 
 .header-actions {
@@ -1273,5 +1272,185 @@
     display: grid;
     grid-template-columns: repeat(18, 1fr);
     gap: 0.5rem;
+  }
+}
+
+// Mobile phones — the question + options should own the visible viewport.
+// Site header/breadcrumb are replaced by a slim sticky bar with a back button;
+// authoring/utility icons and the question grid drop below the fold.
+.mobile-topbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .test-container {
+    padding: 0.5rem;
+  }
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: -0.5rem -0.5rem 0.6rem -0.5rem;
+    padding: 0.6rem 0.75rem;
+    padding-top: max(0.6rem, env(safe-area-inset-top));
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .mobile-back-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: none;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.18);
+    color: white;
+    cursor: pointer;
+
+    svg {
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+
+    &:active {
+      background-color: rgba(255, 255, 255, 0.32);
+    }
+  }
+
+  .mobile-topbar-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: white;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-topbar-progress {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .breadcrumb {
+    display: none;
+  }
+
+  .question-area {
+    padding: 0.85rem;
+  }
+
+  .question-header {
+    margin-bottom: 1rem;
+  }
+
+  .question-number {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  // Authoring/utility actions (move, delete, copy, image upload, stats toggle)
+  // aren't needed while taking a test on a phone — free up the space instead.
+  .header-actions {
+    display: none;
+  }
+
+  .question-text {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .option-label {
+    padding: 0.75rem;
+  }
+
+  .option-text {
+    font-size: 0.95rem;
+  }
+
+  .question-actions {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding-top: 1rem;
+  }
+
+  .btn-submit,
+  .btn-got-it {
+    flex: 1 1 100%;
+    font-size: 1rem;
+  }
+
+  .question-actions .btn-secondary {
+    flex: 1 1 calc(50% - 0.3rem);
+  }
+
+  // Quick navigation grid lives below the question — keep it out of the
+  // way (below the fold) and make the boxes usable at phone widths.
+  .questions-grid-footer {
+    margin-top: 1.5rem;
+    padding: 1rem 0.5rem;
+  }
+
+  .questions-grid-footer .grid-items,
+  .grid-items {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.35rem;
+  }
+
+  .questions-grid-footer .question-box,
+  .question-box {
+    font-size: 0.75rem;
+
+    .question-number-text {
+      font-size: 0.78rem;
+    }
+
+    .question-time-small {
+      font-size: 0.55rem;
+    }
+  }
+
+  .grid-header {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+
+    .grid-controls {
+      display: none;
+    }
+  }
+
+  .test-footer-centered .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .result-card {
+    padding: 1.75rem 1rem;
+  }
+
+  .result-title {
+    font-size: 1.5rem;
+  }
+
+  .score-circle {
+    width: 150px;
+    height: 150px;
+  }
+}
+
+@media (max-width: 400px) {
+  .questions-grid-footer .grid-items,
+  .grid-items {
+    gap: 0.25rem;
   }
 }

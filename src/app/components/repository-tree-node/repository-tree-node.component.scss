@@ -161,6 +161,18 @@
   }
 }
 
+// Attempted / Correct / Incorrect counts are clickable to jump straight into that
+// filtered subset of questions - underline marks them the same way as the question count.
+.cell-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: inherit;
+
+  &:hover {
+    opacity: 0.75;
+  }
+}
+
 .text-success-colored {
   color: #16a34a;
   font-weight: 500;
@@ -169,11 +181,6 @@
 .text-danger-colored {
   color: #dc2626;
   font-weight: 500;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
 }
 
 .cursor-pointer {

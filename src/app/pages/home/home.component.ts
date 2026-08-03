@@ -31,6 +31,8 @@ export class HomeComponent implements OnInit {
 
   profileName: string = "default";
 
+  private pendingExpandPath: string | null = null;
+
   constructor(private route: ActivatedRoute,
     private router: Router,
     private dataService: DataService,
@@ -38,15 +40,19 @@ export class HomeComponent implements OnInit {
 
   ngOnInit(): void {
     this.profileName = this.dataService.getProfileName();
-    this.loadStructure();
-    this.loadRepositorySummaries();
 
-    // Expand ancestor sections based on a deep-link query param (from repository breadcrumbs)
+    // Expand ancestor sections based on a deep-link query param (from repository breadcrumbs).
+    // The tree may not be loaded yet when this fires, so it's re-attempted once loadStructure()
+    // populates this.tree too.
     this.route.queryParams.subscribe(params => {
       if (params['expandPath']) {
-        this.expandAncestors(params['expandPath']);
+        this.pendingExpandPath = params['expandPath'];
+        this.tryExpandPending();
       }
     });
+
+    this.loadStructure();
+    this.loadRepositorySummaries();
   }
 
   loadStructure(): void {
@@ -54,6 +60,7 @@ export class HomeComponent implements OnInit {
       next: (tree) => {
         this.tree = tree;
         this.loading = false;
+        this.tryExpandPending();
       },
       error: (err) => {
         console.error('Error loading structure:', err);
@@ -113,6 +120,18 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  practiceAttempted(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path], {
+      queryParams: { practiceAttemptedOnly: 'true' }
+    });
+  }
+
+  practiceCorrect(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path], {
+      queryParams: { practiceCorrectOnly: 'true' }
+    });
+  }
+
   navigateToPractice(node: RepositoryNode): void {
     this.router.navigate(['/practice', ...node.path]);
   }
@@ -128,7 +147,7 @@ export class HomeComponent implements OnInit {
   clearProgress(payload: { node: RepositoryNode; event: Event }): void {
     const node = payload.node;
     if (confirm(`Clear all practice progress for "${node.name}"?`)) {
-      this.dataService.deletePracticeAttempts(node.path, this.profileName).subscribe({
+      this.dataService.deletePracticeAttempts(node.id, this.profileName).subscribe({
         next: () => {
           localStorage.removeItem(node.path.join('|'));
           this.loadRepositorySummaries();
@@ -149,7 +168,7 @@ export class HomeComponent implements OnInit {
     const collect = (nodes: RepositoryNode[]) => {
       nodes.forEach(n => {
         if (n.hasChildren) {
-          this.expandedPaths.add(n.path.join('|'));
+          this.expandedPaths.add(n.id);
           collect(n.children);
         }
       });
@@ -175,8 +194,7 @@ export class HomeComponent implements OnInit {
   }
 
   private getEffectiveStatus(node: RepositoryNode): string {
-    const key = node.path.join('|');
-    return this.repositorySummaries[key]?.status || 'not_started';
+    return this.repositorySummaries[node.id]?.status || 'not_started';
   }
 
   private nodeMatchesSelf(node: RepositoryNode, query: string): boolean {
@@ -187,7 +205,7 @@ export class HomeComponent implements OnInit {
 
   private addAllDescendants(node: RepositoryNode, visible: Set<string>): void {
     node.children.forEach(child => {
-      visible.add(child.path.join('|'));
+      visible.add(child.id);
       this.addAllDescendants(child, visible);
     });
   }
@@ -196,7 +214,7 @@ export class HomeComponent implements OnInit {
   // by itself, its whole subtree is revealed; when only a descendant matches, only
   // the path down to that descendant is revealed (ancestors shown for context).
   private collectVisible(node: RepositoryNode, query: string, visible: Set<string>, expandTargets: Set<string>): boolean {
-    const key = node.path.join('|');
+    const key = node.id;
     let anyDescendantVisible = false;
     node.children.forEach(child => {
       if (this.collectVisible(child, query, visible, expandTargets)) anyDescendantVisible = true;
@@ -229,13 +247,25 @@ export class HomeComponent implements OnInit {
     expandTargets.forEach(key => this.expandedPaths.add(key));
   }
 
+  private tryExpandPending(): void {
+    if (this.pendingExpandPath && this.tree.length > 0) {
+      this.expandAncestors(this.pendingExpandPath);
+      this.pendingExpandPath = null;
+    }
+  }
+
+  // The breadcrumb on repository/test pages encodes ancestor names as a pipe-joined path
+  // string (it only knows the URL path, not node ids). expandedPaths is keyed by node id,
+  // so walk the tree matching each path segment by name to translate name-path -> id-path.
   private expandAncestors(joinedPath: string): void {
     const segments = joinedPath.split('|').filter(s => !!s);
-    const acc: string[] = [];
-    segments.forEach(seg => {
-      acc.push(seg);
-      this.expandedPaths.add(acc.join('|'));
-    });
+    let currentLevel: RepositoryNode[] = this.tree;
+    for (const seg of segments) {
+      const match = currentLevel.find(n => n.name === seg);
+      if (!match) break;
+      this.expandedPaths.add(match.id);
+      currentLevel = match.children;
+    }
   }
 
   startAITest(): void {

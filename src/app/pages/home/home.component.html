@@ -60,7 +60,8 @@
         <app-repository-tree-node *ngFor="let root of tree" [node]="root" [depth]="0" [expandedPaths]="expandedPaths"
           [summaries]="repositorySummaries" [visiblePaths]="visiblePaths" [searchQuery]="searchQuery"
           (toggleExpand)="toggleExpand($event)" (navigate)="navigateToPractice($event)"
-          (practiceIncorrect)="practiceIncorrect($event)" (clearProgress)="clearProgress($event)">
+          (practiceIncorrect)="practiceIncorrect($event)" (practiceAttempted)="practiceAttempted($event)"
+          (practiceCorrect)="practiceCorrect($event)" (clearProgress)="clearProgress($event)">
         </app-repository-tree-node>
 
         <div *ngIf="tree.length === 0" class="empty-state">No repositories found.</div>

@@ -20,11 +20,13 @@ export class RepositoryTreeNodeComponent {
   @Output() toggleExpand = new EventEmitter<string>();
   @Output() navigate = new EventEmitter<RepositoryNode>();
   @Output() practiceIncorrect = new EventEmitter<RepositoryNode>();
+  @Output() practiceAttempted = new EventEmitter<RepositoryNode>();
+  @Output() practiceCorrect = new EventEmitter<RepositoryNode>();
   @Output() clearProgress = new EventEmitter<{ node: RepositoryNode; event: Event }>();
 
   get key(): string {
-    // Must match the backend's summaries-dictionary key format (pipe-joined path segments).
-    return this.node.path.join('|');
+    // Must match the backend's summaries-dictionary key format (the node's permanent id).
+    return this.node.id;
   }
 
   get isVisible(): boolean {
@@ -68,6 +70,18 @@ export class RepositoryTreeNodeComponent {
     event.preventDefault();
     event.stopPropagation();
     this.practiceIncorrect.emit(this.node);
+  }
+
+  onPracticeAttempted(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.practiceAttempted.emit(this.node);
+  }
+
+  onPracticeCorrect(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.practiceCorrect.emit(this.node);
   }
 
   onClearProgress(event: Event): void {

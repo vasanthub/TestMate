@@ -10,35 +10,6 @@
   }
 }
 
-.tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid #e0e0e0;
-}
-
-.tab-button {
-  padding: 0.6rem 1.2rem;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #666;
-  transition: all 0.3s ease;
-
-  &:hover {
-    color: #333;
-    background-color: #f5f5f5;
-  }
-
-  &.active {
-    color: #2196f3;
-    border-bottom-color: #2196f3;
-  }
-}
-
 .tab-content {
   min-height: 400px;
 }
@@ -47,6 +18,53 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.level-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+  padding: 0.1rem 0 0.25rem;
+}
+
+.crumb {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  color: var(--primary-color, #6366f1);
+  font-size: 0.82rem;
+  font-weight: 600;
+
+  &:hover:not(:disabled) {
+    background-color: #eef2ff;
+  }
+
+  &.current,
+  &:disabled {
+    color: var(--text-primary, #1e293b);
+    cursor: default;
+  }
+}
+
+.crumb-sep {
+  display: inline-flex;
+  color: #cbd5e1;
+
+  svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+}
+
+.level-list {
+  background-color: var(--surface, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow, 0 1px 3px 0 rgb(0 0 0 / 0.1));
+  overflow: hidden;
 }
 
 .search-section {
@@ -226,6 +244,10 @@ mark {
   font-size: 0.8rem;
   border-bottom: 2px solid #e2e8f0;
   white-space: nowrap;
+
+  &.condensed {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
 }
 
 .tree-col {

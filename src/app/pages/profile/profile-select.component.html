@@ -1,0 +1,16 @@
+<div class="profile-select">
+  <div class="intro">
+    <h1>Who's practising?</h1>
+    <p>Pick a profile so your test results and progress are saved against it.
+      You can switch any time from the header.</p>
+  </div>
+
+  <div class="profile-grid">
+    <button *ngFor="let name of profiles" class="profile-card" [class.current]="name === current"
+      (click)="choose(name)">
+      <span class="avatar">{{ name.charAt(0) }}</span>
+      <span class="name">{{ name }}</span>
+      <span *ngIf="name === current" class="badge">Current</span>
+    </button>
+  </div>
+</div>

@@ -66,6 +66,57 @@
   background-color: var(--background);
 }
 
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+}
+
+.admin-toggle-track {
+  position: relative;
+  width: 2rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background-color: #cbd5e1;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.admin-toggle-thumb {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease;
+}
+
+.admin-toggle input:checked + .admin-toggle-track {
+  background-color: var(--primary-color);
+}
+
+.admin-toggle input:checked + .admin-toggle-track .admin-toggle-thumb {
+  transform: translateX(0.85rem);
+}
+
+.admin-toggle-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .profile {
   display: flex;
   align-items: center;
@@ -76,6 +127,12 @@
   color: var(--text-primary);
   font-weight: 500;
   white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--border-color);
+  }
 }
 
 .profile-icon {
@@ -96,6 +153,10 @@
 
   .profile span {
     font-size: 0.85rem;
+  }
+
+  .admin-toggle-label {
+    display: none;
   }
 
   .header-content {

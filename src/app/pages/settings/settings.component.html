@@ -1,0 +1,62 @@
+<div class="settings-page">
+  <div class="settings-head">
+    <h1>Settings</h1>
+    <a routerLink="/" class="back-link">Back to repositories</a>
+  </div>
+
+  <section class="setting-card">
+    <div class="setting-title">
+      <h2>Repository browsing</h2>
+      <p>How the repository list is laid out on the home page.</p>
+    </div>
+
+    <label class="option" [class.selected]="browseLayout === 'stepwise'">
+      <input type="radio" name="browseLayout" [checked]="browseLayout === 'stepwise'"
+        (change)="setBrowseLayout('stepwise')">
+      <span class="option-body">
+        <span class="option-name">Guided drill-down</span>
+        <span class="option-desc">Show one level at a time. Start at the top level and pick your way down,
+          and start a test at any level along the way.</span>
+      </span>
+    </label>
+
+    <label class="option" [class.selected]="browseLayout === 'fullTree'">
+      <input type="radio" name="browseLayout" [checked]="browseLayout === 'fullTree'"
+        (change)="setBrowseLayout('fullTree')">
+      <span class="option-body">
+        <span class="option-name">Full tree</span>
+        <span class="option-desc">Show the whole hierarchy at once, with expand / collapse, search and
+          status filtering.</span>
+      </span>
+    </label>
+  </section>
+
+  <section class="setting-card">
+    <div class="setting-title">
+      <h2>Condensed list</h2>
+      <p>Show only the repository name and question count, hiding the progress columns.
+        Easier to read on a phone.</p>
+    </div>
+
+    <label class="toggle">
+      <input type="checkbox" [checked]="condensedList" (change)="setCondensedList(!condensedList)">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">{{ condensedList ? 'On' : 'Off' }}</span>
+    </label>
+  </section>
+
+  <section class="setting-card">
+    <div class="setting-title">
+      <h2>Repo management</h2>
+      <p>Show the question-authoring tools on the test screen &mdash; move and delete questions,
+        clipboard image upload and bulk-select. Leave off for a distraction-free study view.
+        Same switch as the Admin toggle in the header.</p>
+    </div>
+
+    <label class="toggle">
+      <input type="checkbox" [checked]="repoManagement" (change)="setRepoManagement(!repoManagement)">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label">{{ repoManagement ? 'On' : 'Off' }}</span>
+    </label>
+  </section>
+</div>

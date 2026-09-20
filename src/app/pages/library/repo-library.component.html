@@ -1,0 +1,43 @@
+<div class="library-page">
+  <div class="library-head">
+    <div>
+      <h1>Repo library</h1>
+      <p>Choose which repositories show up for <strong>{{ profileName }}</strong>. Tick a folder to
+        include everything under it. Leave everything unticked to show all repositories.</p>
+    </div>
+    <a routerLink="/" class="back-link">Back to repositories</a>
+  </div>
+
+  <div *ngIf="loading" class="library-loading">Loading repositories…</div>
+
+  <div *ngIf="error" class="library-error">{{ error }}</div>
+
+  <ng-container *ngIf="!loading && !error">
+    <div class="library-toolbar">
+      <div class="counts">
+        <ng-container *ngIf="selectionCount > 0; else showingAll">
+          {{ selectionCount }} selected
+        </ng-container>
+        <ng-template #showingAll>Nothing selected — all repositories shown</ng-template>
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" class="link-btn" (click)="selectAll()">Select all</button>
+        <button type="button" class="link-btn" (click)="clearAll()">Clear</button>
+      </div>
+    </div>
+
+    <div class="library-tree">
+      <app-library-tree-node *ngFor="let node of tree" [node]="node" [depth]="0"
+        [checkedIds]="checkedIds" [descendantsById]="descendantsById" [expandedIds]="expandedIds"
+        (toggle)="onToggle($event)" (toggleExpand)="onToggleExpand($event)">
+      </app-library-tree-node>
+    </div>
+
+    <div class="library-footer">
+      <span *ngIf="saved && !dirty" class="saved-note">Saved</span>
+      <button type="button" class="save-btn" [disabled]="saving || !dirty" (click)="save()">
+        {{ saving ? 'Saving…' : 'Save library' }}
+      </button>
+    </div>
+  </ng-container>
+</div>

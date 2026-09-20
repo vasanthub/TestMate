@@ -25,37 +25,44 @@
           Question {{ currentIndex + 1 }} of {{ questions.length }}
         </div>
         <div class="header-actions">
-          <span class="clipboard-label">{{ClipboardCopyStatus}}</span>
+          <ng-container *ngIf="repoManagement">
+            <span class="clipboard-label">{{ClipboardCopyStatus}}</span>
 
-          <button class="btn-icon" (click)="openMoveQuestionDialog()"
-            [title]="selectedQuestionIndices.size > 0 ? 'Move ' + selectedQuestionIndices.size + ' selected questions' : 'Move current question'">
-            📦<span *ngIf="selectedQuestionIndices.size > 0"
-              class="selection-badge">{{selectedQuestionIndices.size}}</span>
-          </button>
+            <button class="btn-icon" (click)="openMoveQuestionDialog()"
+              [title]="selectedQuestionIndices.size > 0 ? 'Move ' + selectedQuestionIndices.size + ' selected questions' : 'Move current question'">
+              📦<span *ngIf="selectedQuestionIndices.size > 0"
+                class="selection-badge">{{selectedQuestionIndices.size}}</span>
+            </button>
 
-          <button class="btn-icon btn-icon-danger" (click)="openDeleteQuestionDialog()" title="Delete question">
-            🗑️
-          </button>
+            <button class="btn-icon btn-icon-danger" (click)="openDeleteQuestionDialog()" title="Delete question">
+              🗑️
+            </button>
 
-          <button class="btn-icon" (click)="copyQuestionToClipboard()" title="Copy question">
-            📑
-          </button>
+            <button class="btn-icon" (click)="copyQuestionToClipboard()" title="Copy question">
+              📑
+            </button>
 
-          <button class="btn-icon"
-            (click)="uploadImageFromClipboard(currentIndex, 1, $event)" title="Image Upload">
-            📁1
-          </button>
-          <button class="btn-icon"
-            (click)="uploadImageFromClipboard(currentIndex, 2, $event)" title="Image Upload">
-            📁2
-          </button>
-          <button class="btn-icon"
-            (click)="uploadImageFromClipboard(currentIndex, 3, $event)" title="Image Upload">
-            📁3
-          </button>
-          <button class="btn-icon"
-            (click)="uploadImageFromClipboard(currentIndex, 4, $event)" title="Image Upload">
-            📁4
+            <button class="btn-icon"
+              (click)="uploadImageFromClipboard(currentIndex, 1, $event)" title="Image Upload">
+              📁1
+            </button>
+            <button class="btn-icon"
+              (click)="uploadImageFromClipboard(currentIndex, 2, $event)" title="Image Upload">
+              📁2
+            </button>
+            <button class="btn-icon"
+              (click)="uploadImageFromClipboard(currentIndex, 3, $event)" title="Image Upload">
+              📁3
+            </button>
+            <button class="btn-icon"
+              (click)="uploadImageFromClipboard(currentIndex, 4, $event)" title="Image Upload">
+              📁4
+            </button>
+          </ng-container>
+
+          <button class="btn-icon btn-flag" [class.active]="isCurrentFlagged" (click)="toggleFlag(currentIndex)"
+            [title]="isCurrentFlagged ? 'Unflag this question' : 'Flag this question to revisit later'">
+            {{ isCurrentFlagged ? '🚩' : '🏳️' }}
           </button>
 
           <button class="btn-icon" (click)="toggleStats()"
@@ -71,7 +78,7 @@
 
       <div class="question-content">
         <div class="question-text">
-          <ng-container *ngFor="let line of (currentQuestion.question || '').split('\n')">
+          <ng-container *ngFor="let line of textLines(currentQuestion.question)">
             <span [innerHTML]="renderLatex(line)"></span>
             <br>
           </ng-container>
@@ -153,7 +160,7 @@
               <img [src]="getQuestionImage(3)" alt="Answer image">
             </div>
             <div>
-              <ng-container *ngFor="let line of (currentQuestion.answerText || '').split('\n')">
+              <ng-container *ngFor="let line of textLines(currentQuestion.answerText)">
                 <span [innerHTML]="renderLatex(line)"></span>
                 <br>
               </ng-container>
@@ -216,7 +223,7 @@
           class="correct-text-answer">
           <strong>Explanation:</strong>
           <div>
-            <ng-container *ngFor="let line of currentQuestion.explanation.split('\n')">
+            <ng-container *ngFor="let line of textLines(currentQuestion.explanation)">
               <span [innerHTML]="renderLatex(line)"></span>
               <br>
             </ng-container>
@@ -227,7 +234,7 @@
       <div class="questions-grid-footer">
         <div class="grid-header">
           Quick Navigation
-          <div class="grid-controls">
+          <div class="grid-controls" *ngIf="repoManagement">
             <button class="btn-link-sm" [class.active]="isSelectMode" (click)="toggleSelectMode()">
               {{ isSelectMode ? 'Exit Select' : 'Select Mode' }}
             </button>
@@ -241,12 +248,13 @@
             [class.correct]="getQuestionStatus(i) === 'correct'"
             [class.incorrect]="getQuestionStatus(i) === 'incorrect' || getQuestionStatus(i) === 'incorrectPreviousAttempt'"
             [class.unanswered]="getQuestionStatus(i) === 'unanswered'"
-            [class.selected-move]="selectedQuestionIndices.has(i)" (click)="goToQuestion(i)"
-            (contextmenu)="toggleQuestionSelection(i, $event)">
+            [class.selected-move]="selectedQuestionIndices.has(i)" [class.flagged]="attempts[i].flagged"
+            (click)="goToQuestion(i)" (contextmenu)="toggleQuestionSelection(i, $event)">
             <div class="question-number-text">{{ i + 1 }}</div>
             <div *ngIf="showStats && attempts[i]?.time_taken" class="question-time-small">{{
               formatTimeDisplay(attempts[i].time_taken) }}
             </div>
+            <span *ngIf="attempts[i]?.flagged" class="flag-marker">🚩</span>
             <div *ngIf="selectedQuestionIndices.has(i)" class="selection-marker">✓</div>
           </button>
         </div>

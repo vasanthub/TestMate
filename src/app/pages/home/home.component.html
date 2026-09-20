@@ -5,18 +5,10 @@
     <p>Loading repositories...</p>
   </div>
 
-  <div class="tabs">
-    <button class="tab-button" [class.active]="activeTab === 'predefined'" (click)="switchTab('predefined')">
-      PRE-DEFINED
-    </button>
-    <button class="tab-button" [class.active]="activeTab === 'ai'" (click)="switchTab('ai')">
-      AI-POWERED
-    </button>
-  </div>
-
   <div class="tab-content">
-    <div *ngIf="!loading && activeTab === 'predefined'" class="predefined-content">
+    <div *ngIf="!loading" class="predefined-content">
 
+      <ng-container *ngIf="browseLayout === 'fullTree'">
       <div class="search-section">
         <div class="search-box">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -46,19 +38,22 @@
       </div>
 
       <div class="tree-container">
-        <div class="tree-header">
+        <div class="tree-header" [class.condensed]="condensedList">
           <div class="tree-col tree-col-name">Repository</div>
           <div class="tree-col text-center">Questions</div>
-          <div class="tree-col text-center">Attempted</div>
-          <div class="tree-col text-center">%</div>
-          <div class="tree-col text-center">Correct</div>
-          <div class="tree-col text-center">Incorrect</div>
-          <div class="tree-col text-right">Avg. Time</div>
-          <div class="tree-col text-right">Score</div>
+          <ng-container *ngIf="!condensedList">
+            <div class="tree-col text-center">Attempted</div>
+            <div class="tree-col text-center">%</div>
+            <div class="tree-col text-center">Correct</div>
+            <div class="tree-col text-center">Incorrect</div>
+            <div class="tree-col text-right">Avg. Time</div>
+            <div class="tree-col text-right">Score</div>
+          </ng-container>
         </div>
 
         <app-repository-tree-node *ngFor="let root of tree" [node]="root" [depth]="0" [expandedPaths]="expandedPaths"
           [summaries]="repositorySummaries" [visiblePaths]="visiblePaths" [searchQuery]="searchQuery"
+          [condensed]="condensedList"
           (toggleExpand)="toggleExpand($event)" (navigate)="navigateToPractice($event)"
           (practiceIncorrect)="practiceIncorrect($event)" (practiceAttempted)="practiceAttempted($event)"
           (practiceCorrect)="practiceCorrect($event)" (clearProgress)="clearProgress($event)">
@@ -66,9 +61,38 @@
 
         <div *ngIf="tree.length === 0" class="empty-state">No repositories found.</div>
       </div>
+      </ng-container>
+
+      <ng-container *ngIf="browseLayout === 'stepwise'">
+      <nav class="level-nav" *ngIf="levelStack.length > 0">
+        <button class="crumb crumb-home" (click)="drillToLevel(-1)">Home</button>
+        <ng-container *ngFor="let n of levelStack; let i = index">
+          <span class="crumb-sep" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <button class="crumb" [class.current]="i === levelStack.length - 1" [disabled]="i === levelStack.length - 1"
+            (click)="drillToLevel(i)">{{ n.name }}</button>
+        </ng-container>
+      </nav>
+
+      <div class="level-list">
+        <app-repository-level-row *ngFor="let node of currentLevelNodes"
+          [node]="node" [summary]="repositorySummaries[node.id] || null" [condensed]="condensedList"
+          (drillIn)="drillInto(node)" (startPractice)="navigateToPractice(node)"
+          (reviewAttempted)="practiceAttempted(node)" (reviewCorrect)="practiceCorrect(node)"
+          (reviewIncorrect)="practiceIncorrect(node)" (reviewRemaining)="practiceRemaining(node)"
+          (reviewFlagged)="practiceFlagged(node)">
+        </app-repository-level-row>
+
+        <div *ngIf="currentLevelNodes.length === 0" class="empty-state">Nothing at this level.</div>
+      </div>
+      </ng-container>
     </div>
 
-    <div *ngIf="activeTab === 'ai'" class="ai-tab">
+    <!-- AI-powered generator: hidden for now (showAiTab === false) but kept intact. -->
+    <div *ngIf="showAiTab" class="ai-tab">
       <h2>AI-Powered Dynamic Test</h2>
 
       <div class="ai-content">

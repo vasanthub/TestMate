@@ -36,6 +36,7 @@ export interface QuestionAttempt {
   skipped?: boolean;
   incorrectPreviousAttempt: boolean;
   time_taken?: string;
+  flagged?: boolean;
 }
 
 export interface TestInstance {
@@ -78,6 +79,7 @@ export interface RepositorySummary {
   attempted: number;
   correct: number;
   incorrect: number;
+  flagged: number;
   score: number;
   avgTime?: string;
   lastUpdated: string;

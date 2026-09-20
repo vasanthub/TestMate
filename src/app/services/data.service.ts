@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, tap } from 'rxjs/operators';
 import { Question, AggregatedQuestion, TestInstance, RepositoryNode, TestMateSettings, SiblingRepository } from '../models/question.model';
 import { environment } from '../../environments/environment';
 
@@ -10,18 +10,51 @@ import { environment } from '../../environments/environment';
 })
 export class DataService {
   private apiUrl = environment.apiUrl;
-  private profileName$ = new BehaviorSubject<string>('Jade');
+
+  // No real authentication yet - a "profile" just scopes stored test results and
+  // progress. It arrives one of two ways:
+  //   1. ?profileName=<name> in the URL, when this app is launched from the parent app
+  //      (used for the session, not remembered).
+  //   2. picked on the profile screen when the app is opened directly, then remembered
+  //      in localStorage so it isn't asked for on every visit.
+  private static readonly PROFILE_STORAGE_KEY = 'testmate.profileName';
+  readonly availableProfiles: readonly string[] = ['Jade', 'Cherish', 'Vasant', 'Jasmine'];
+
+  private profileName$ = new BehaviorSubject<string>('');
+  private profileChosen = false;
+
+  /** Emits the active profile name; '' until one is chosen. */
+  readonly profileName = this.profileName$.asObservable();
 
   constructor(private http: HttpClient) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const profile = urlParams.get('profileName');
-    if (profile) {
-      this.profileName$.next(profile);
+    const urlProfile = new URLSearchParams(window.location.search).get('profileName');
+    if (urlProfile) {
+      this.profileName$.next(urlProfile);
+      this.profileChosen = true;
+    } else {
+      const stored = this.readStoredProfile();
+      if (stored) {
+        this.profileName$.next(stored);
+        this.profileChosen = true;
+      }
     }
   }
 
   getApiUrl(): string {
     return this.apiUrl;
+  }
+
+  /** True once a profile is known (from the URL or a previous choice). */
+  hasProfile(): boolean {
+    return this.profileChosen;
+  }
+
+  private readStoredProfile(): string | null {
+    try {
+      return localStorage.getItem(DataService.PROFILE_STORAGE_KEY);
+    } catch {
+      return null;
+    }
   }
 
   private pathSegment(path: string[]): string {
@@ -42,14 +75,37 @@ export class DataService {
 
   setProfileName(name: string): void {
     this.profileName$.next(name);
+    this.profileChosen = true;
+    try {
+      localStorage.setItem(DataService.PROFILE_STORAGE_KEY, name);
+    } catch {
+      /* localStorage unavailable - profile just won't persist across reloads */
+    }
   }
 
   getSettings(): Observable<TestMateSettings> {
     return this.http.get<TestMateSettings>(`${this.apiUrl}/testmate-settings`);
   }
 
-  getTree(): Observable<RepositoryNode[]> {
-    return this.http.get<RepositoryNode[]>(`${this.apiUrl}/structure`);
+  // The repository tree is rebuilt server-side by walking the whole data folder,
+  // which takes a couple of seconds. It barely changes during a session, so the
+  // result is cached in memory: the first load hits the API, every later call
+  // (e.g. navigating back to Home from a question) resolves instantly. The cache
+  // is dropped by invalidateTreeCache() after anything that could change it, and
+  // a full page reload clears it too.
+  private cachedTree: RepositoryNode[] | null = null;
+
+  getTree(forceRefresh = false): Observable<RepositoryNode[]> {
+    if (!forceRefresh && this.cachedTree) {
+      return of(this.cachedTree);
+    }
+    return this.http.get<RepositoryNode[]>(`${this.apiUrl}/structure`).pipe(
+      tap(tree => this.cachedTree = tree)
+    );
+  }
+
+  invalidateTreeCache(): void {
+    this.cachedTree = null;
   }
 
   getRepository(path: string[]): Observable<AggregatedQuestion[]> {
@@ -196,6 +252,20 @@ export class DataService {
     return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/repository-status?profileName=${profileName}`);
   }
 
+  // The repository ids a profile has added to its library (roots of chosen
+  // branches; descendants are implied). Empty => the profile sees everything.
+  getProfileLibrary(profileName?: string): Observable<string[]> {
+    const profile = profileName || this.getProfileName();
+    return this.http
+      .get<{ repositoryIds: string[] }>(`${this.apiUrl}/profile-repos?profileName=${encodeURIComponent(profile)}`)
+      .pipe(map(res => res?.repositoryIds ?? []));
+  }
+
+  setProfileLibrary(repositoryIds: string[], profileName?: string): Observable<any> {
+    const profile = profileName || this.getProfileName();
+    return this.http.post(`${this.apiUrl}/profile-repos`, { profileName: profile, repositoryIds });
+  }
+
   updateRepositoryStatus(repositoryId: string, status: string, profileName: string = 'default'): Observable<any> {
     return this.http.post(`${this.apiUrl}/repository-status`, {
       repositoryId,
@@ -274,7 +344,7 @@ export class DataService {
     return this.http.post(`${this.apiUrl}/move-question`, {
       items,
       targetId
-    });
+    }).pipe(tap(() => this.invalidateTreeCache()));
   }
 
   deleteQuestion(
@@ -284,7 +354,7 @@ export class DataService {
     return this.http.post(`${this.apiUrl}/delete-question`, {
       sourceId,
       sourceIndex
-    });
+    }).pipe(tap(() => this.invalidateTreeCache()));
   }
 
 }

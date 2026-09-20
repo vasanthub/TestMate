@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { DataService } from '../../services/data.service';
+import { SettingsService } from '../../services/settings.service';
 
 @Component({
   selector: 'app-header',
@@ -12,17 +13,27 @@ import { DataService } from '../../services/data.service';
   styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent implements OnInit {
-  profileName: string = 'default';
+  profileName: string = '';
   isTestRoute: boolean = false;
+  repoManagement: boolean = false;
 
-  constructor(private dataService: DataService, private router: Router) {}
+  constructor(
+    private dataService: DataService,
+    private router: Router,
+    private settings: SettingsService
+  ) {}
 
   ngOnInit(): void {
-    this.profileName = this.dataService.getProfileName();
+    this.dataService.profileName.subscribe(name => this.profileName = name);
     this.updateIsTestRoute(this.router.url);
     this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe(event => this.updateIsTestRoute(event.urlAfterRedirects));
+    this.settings.repoManagement.subscribe(on => this.repoManagement = on);
+  }
+
+  setRepoManagement(value: boolean): void {
+    this.settings.setRepoManagement(value);
   }
 
   private updateIsTestRoute(url: string): void {

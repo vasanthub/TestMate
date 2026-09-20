@@ -3,23 +3,46 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { DataService } from '../../services/data.service';
+import { SettingsService, BrowseLayout } from '../../services/settings.service';
 import { RepositoryNode, RepositorySummary } from '../../models/question.model';
+import { filterTreeByLibrary } from '../../utils/repo-library';
 import { RepositoryTreeNodeComponent } from '../../components/repository-tree-node/repository-tree-node.component';
+import { RepositoryLevelRowComponent } from '../../components/repository-level-row/repository-level-row.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, RepositoryTreeNodeComponent],
+  imports: [CommonModule, RouterModule, FormsModule, RepositoryTreeNodeComponent, RepositoryLevelRowComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit {
+  // The AI-powered generator is kept in the codebase but hidden from the UI for now.
+  // Flip to true (and it reappears) once the feature is ready again.
+  readonly showAiTab = false;
+
   activeTab: 'predefined' | 'ai' = 'predefined';
   tree: RepositoryNode[] = [];
   loading = true;
   aiTopic: string = '';
   isLoadingAI: boolean = false;
+
+  // The full tree as returned by the API; `tree` is this filtered to the active
+  // profile's library (and unwrapped past any single-folder root).
+  private rawTree: RepositoryNode[] = [];
+  private libraryIds = new Set<string>();
+
+  // Chosen on the Settings screen. 'stepwise' = level-at-a-time drill-down (default),
+  // 'fullTree' = the whole recursive tree. condensedList hides every column except
+  // the repository name and question count (a mobile-friendly view).
+  browseLayout: BrowseLayout = 'stepwise';
+  condensedList = false;
+
+  // Ancestors the user has drilled into for the step-by-step view.
+  levelStack: RepositoryNode[] = [];
 
   expandedPaths: Set<string> = new Set<string>();
   visiblePaths: Set<string> | null = null;
@@ -36,10 +59,14 @@ export class HomeComponent implements OnInit {
   constructor(private route: ActivatedRoute,
     private router: Router,
     private dataService: DataService,
+    private settings: SettingsService,
     private http: HttpClient) { }
 
   ngOnInit(): void {
     this.profileName = this.dataService.getProfileName();
+
+    this.settings.browseLayout.subscribe(layout => this.browseLayout = layout);
+    this.settings.condensedList.subscribe(condensed => this.condensedList = condensed);
 
     // Expand ancestor sections based on a deep-link query param (from repository breadcrumbs).
     // The tree may not be loaded yet when this fires, so it's re-attempted once loadStructure()
@@ -56,9 +83,14 @@ export class HomeComponent implements OnInit {
   }
 
   loadStructure(): void {
-    this.dataService.getTree().subscribe({
-      next: (tree) => {
-        this.tree = tree;
+    forkJoin({
+      tree: this.dataService.getTree(),
+      library: this.dataService.getProfileLibrary().pipe(catchError(() => of<string[]>([])))
+    }).subscribe({
+      next: ({ tree, library }) => {
+        this.rawTree = tree;
+        this.libraryIds = new Set(library);
+        this.tree = this.promoteSingleRoot(filterTreeByLibrary(tree, this.libraryIds));
         this.loading = false;
         this.tryExpandPending();
       },
@@ -132,6 +164,18 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  practiceRemaining(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path], {
+      queryParams: { practiceRemainingOnly: 'true' }
+    });
+  }
+
+  practiceFlagged(node: RepositoryNode): void {
+    this.router.navigate(['/practice', ...node.path], {
+      queryParams: { practiceFlaggedOnly: 'true' }
+    });
+  }
+
   navigateToPractice(node: RepositoryNode): void {
     this.router.navigate(['/practice', ...node.path]);
   }
@@ -162,6 +206,29 @@ export class HomeComponent implements OnInit {
 
   switchTab(tab: 'predefined' | 'ai'): void {
     this.activeTab = tab;
+  }
+
+  // The repositories shown in the drill-down view: the roots when nothing is
+  // selected, otherwise the children of the deepest node in the stack. Returns
+  // live references (never a new array) so change detection stays stable.
+  get currentLevelNodes(): RepositoryNode[] {
+    if (this.levelStack.length === 0) return this.tree;
+    return this.levelStack[this.levelStack.length - 1].children;
+  }
+
+  drillInto(node: RepositoryNode): void {
+    if (node.hasChildren) {
+      this.levelStack = [...this.levelStack, node];
+    }
+  }
+
+  // Breadcrumb click. index === -1 jumps back to the roots.
+  drillToLevel(index: number): void {
+    this.levelStack = index < 0 ? [] : this.levelStack.slice(0, index + 1);
+  }
+
+  levelBack(): void {
+    this.levelStack = this.levelStack.slice(0, -1);
   }
 
   expandAll(): void {
@@ -248,24 +315,53 @@ export class HomeComponent implements OnInit {
   }
 
   private tryExpandPending(): void {
-    if (this.pendingExpandPath && this.tree.length > 0) {
-      this.expandAncestors(this.pendingExpandPath);
-      this.pendingExpandPath = null;
+    if (!this.pendingExpandPath || this.tree.length === 0) return;
+
+    const chain = this.resolveNodeChain(this.pendingExpandPath);
+    this.pendingExpandPath = null;
+    if (chain.length === 0) return;
+
+    // Full-tree view: expand every ancestor so the linked folder is revealed.
+    chain.forEach(n => this.expandedPaths.add(n.id));
+
+    // Guided drill-down view: open the level list at the linked folder itself
+    // (fall back to its nearest ancestor that actually has children).
+    let stack = chain;
+    while (stack.length > 0 && !stack[stack.length - 1].hasChildren) {
+      stack = stack.slice(0, -1);
     }
+    this.levelStack = stack;
   }
 
-  // The breadcrumb on repository/test pages encodes ancestor names as a pipe-joined path
-  // string (it only knows the URL path, not node ids). expandedPaths is keyed by node id,
-  // so walk the tree matching each path segment by name to translate name-path -> id-path.
-  private expandAncestors(joinedPath: string): void {
+  // If the only thing shown is one folder that has sub-repositories, surface those
+  // sub-repositories as the roots instead. Just one level - if that still leaves a
+  // single folder, it stays as the shown root rather than being unwrapped again.
+  private promoteSingleRoot(nodes: RepositoryNode[]): RepositoryNode[] {
+    if (nodes.length === 1 && nodes[0].hasChildren) {
+      return nodes[0].children;
+    }
+    return nodes;
+  }
+
+  // The breadcrumb on repository/test pages encodes ancestor names as a pipe-joined
+  // path string (it only knows the URL path, not node ids). Walk the tree matching
+  // each segment by name to turn that name-path into the actual node chain. Leading
+  // segments that aren't in the (filtered / promoted) tree are skipped so a
+  // breadcrumb still resolves once it reaches a visible folder.
+  private resolveNodeChain(joinedPath: string): RepositoryNode[] {
     const segments = joinedPath.split('|').filter(s => !!s);
+    const chain: RepositoryNode[] = [];
     let currentLevel: RepositoryNode[] = this.tree;
     for (const seg of segments) {
       const match = currentLevel.find(n => n.name === seg);
-      if (!match) break;
-      this.expandedPaths.add(match.id);
+      if (!match) {
+        if (chain.length === 0) continue;
+        break;
+      }
+      chain.push(match);
       currentLevel = match.children;
     }
+    return chain;
   }
 
   startAITest(): void {

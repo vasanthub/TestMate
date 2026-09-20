@@ -4,6 +4,7 @@ import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { LatexService } from '../../services/latex.service';
+import { SettingsService } from '../../services/settings.service';
 import { Question, QuestionAttempt, TestInstance, SiblingRepository } from '../../models/question.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { environment } from '../../../environments/environment';
@@ -60,6 +61,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   practiceIncorrectOnly: boolean = false;
   practiceAttemptedOnly: boolean = false;
   practiceCorrectOnly: boolean = false;
+  practiceRemainingOnly: boolean = false;
+  practiceFlaggedOnly: boolean = false;
 
   hideAnswer: boolean = true;
 
@@ -73,15 +76,25 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   isDeletingQuestion: boolean = false;
   selectedQuestionIndices: Set<number> = new Set<number>();
   isSelectMode: boolean = false;
-  showStats: boolean = localStorage.getItem('show_test_stats') === 'true';
+  // Explicit user choice wins; otherwise default hidden on phones (limited
+  // screen space) and visible on tablet/laptop (>640px, this app's mobile breakpoint).
+  showStats: boolean = (() => {
+    const stored = localStorage.getItem('show_test_stats');
+    return stored !== null ? stored === 'true' : window.innerWidth > 640;
+  })();
   lastQuestionTime: string = '00:00';
   questionStartTime: number = Date.now();
+
+  // When off (the default), the question-authoring tools (move / delete / image
+  // upload / bulk-select) are hidden. Toggled via the header's Admin switch or the Settings screen.
+  repoManagement: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private dataService: DataService,
     private latexService: LatexService,
+    private settings: SettingsService,
     private sanitizer: DomSanitizer,
     private ngZone: NgZone
   ) {
@@ -116,6 +129,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnInit(): void {
+    this.settings.repoManagement.subscribe(on => this.repoManagement = on);
+
     this.route.url.subscribe(segments => {
       this.path = segments.map(s => s.path);
       this.isPractice = this.router.url.split('?')[0].split('/')[1] === 'practice';
@@ -142,6 +157,8 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
       this.practiceIncorrectOnly = params['practiceIncorrectOnly'] === 'true';
       this.practiceAttemptedOnly = params['practiceAttemptedOnly'] === 'true';
       this.practiceCorrectOnly = params['practiceCorrectOnly'] === 'true';
+      this.practiceRemainingOnly = params['practiceRemainingOnly'] === 'true';
+      this.practiceFlaggedOnly = params['practiceFlaggedOnly'] === 'true';
 
       this.hideAnswer = params['hideAnswer'] === 'true';
 
@@ -445,6 +462,42 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
                 time_taken: undefined
               }));
             }
+            else if (this.practiceRemainingOnly && serverAttempts && serverAttempts.length > 0) {
+              const remainingIndices = serverAttempts
+                .filter((a: QuestionAttempt) => a.skipped)
+                .map((a: QuestionAttempt) => a.question_index);
+
+              this.questions = remainingIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
+
+              // Create FRESH attempts for this session (temporary, not saved)
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false,
+                answered: undefined,
+                time_taken: undefined
+              }));
+            }
+            else if (this.practiceFlaggedOnly && serverAttempts && serverAttempts.length > 0) {
+              const flaggedIndices = serverAttempts
+                .filter((a: QuestionAttempt) => a.flagged)
+                .map((a: QuestionAttempt) => a.question_index);
+
+              this.questions = flaggedIndices.map((i: number) => allQuestions[i]).filter((q: Question) => q !== undefined);
+
+              // Create FRESH attempts for this session (temporary, not saved) but keep the
+              // flag itself real so it can still be reviewed/cleared from this list.
+              this.attempts = this.questions.map((_, index) => ({
+                question_index: index,
+                correct: false,
+                skipped: true,
+                incorrectPreviousAttempt: false,
+                flagged: true,
+                answered: undefined,
+                time_taken: undefined
+              }));
+            }
             else if (filterQuestions === 'true' && serverAttempts && serverAttempts.length > 0) {
               const indices: number[] = serverAttempts.map((a: QuestionAttempt) => a.question_index);
               this.questions = indices.map(i => allQuestions[i]).filter(q => q !== undefined);
@@ -456,7 +509,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
               this.questions = allQuestions;
             }
 
-            if (!this.practiceIncorrectOnly && !this.practiceAttemptedOnly && !this.practiceCorrectOnly) {
+            if (!this.practiceIncorrectOnly && !this.practiceAttemptedOnly && !this.practiceCorrectOnly && !this.practiceRemainingOnly && !this.practiceFlaggedOnly) {
               if (serverAttempts && serverAttempts.length > 0) {
                 this.attempts = serverAttempts;
                 if (this.attempts.length < this.questions.length) {
@@ -687,6 +740,13 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sanitizer.bypassSecurityTrustHtml(rendered);
   }
 
+  // Breaks question / answer / explanation text into display lines, honouring
+  // both real newlines and line breaks stored as a literal "\n" (see
+  // LatexService.splitIntoLines).
+  textLines(text: string | null | undefined): string[] {
+    return this.latexService.splitIntoLines(text);
+  }
+
   onOptionChange(index: number): void {
     if (this.isSingleAnswer) {
       this.selectedOptions = new Array(this.selectedOptions.length).fill(false);
@@ -801,6 +861,44 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
     this.saveProgress();
   }
 
+  get isCurrentFlagged(): boolean {
+    return !!this.attempts[this.currentIndex]?.flagged;
+  }
+
+  // Flagging is independent of the answer-tracking flow above: it's persisted to the
+  // server directly (merged into whatever's already recorded for that question) rather
+  // than going through saveProgress, so it still works inside a filtered review session
+  // (incorrect/attempted/correct/remaining/flagged-only) where saveProgress is a no-op.
+  toggleFlag(index: number): void {
+    const attempt = this.attempts[index];
+    if (!attempt) return;
+    attempt.flagged = !attempt.flagged;
+    this.persistFlag(index, attempt.flagged);
+  }
+
+  private persistFlag(index: number, flagged: boolean): void {
+    const q = this.questions[index];
+    if (!q?.__sourceId || q.__sourceIndex === undefined) return;
+
+    const sourceId = q.__sourceId;
+    const sourceIndex = q.__sourceIndex;
+    const profileName = this.dataService.getProfileName();
+
+    this.dataService.getPracticeAttempts(sourceId).pipe(
+      switchMap((existing: QuestionAttempt[]) => {
+        const maxIndex = Math.max(existing.length - 1, sourceIndex);
+        const merged: QuestionAttempt[] = [];
+        for (let idx = 0; idx <= maxIndex; idx++) {
+          merged[idx] = existing[idx] || { question_index: idx, correct: false, skipped: true, incorrectPreviousAttempt: false };
+        }
+        merged[sourceIndex] = { ...merged[sourceIndex], question_index: sourceIndex, flagged };
+        return this.dataService.savePracticeAttempts(sourceId, profileName, merged);
+      })
+    ).subscribe({
+      error: (err) => console.error('Failed to save flag', err)
+    });
+  }
+
   goToQuestion(index: number): void {
     if (this.isSelectMode) {
       this.toggleQuestionSelection(index);
@@ -903,7 +1001,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveProgress(): void {
-    if (this.isAIGenerated || this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly) return;
+    if (this.isAIGenerated || this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly || this.practiceRemainingOnly || this.practiceFlaggedOnly) return;
 
     const profileName = this.dataService.getProfileName();
 
@@ -1007,7 +1105,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   saveAsTestInstance(): void {
-    if (this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly) return;
+    if (this.practiceIncorrectOnly || this.practiceAttemptedOnly || this.practiceCorrectOnly || this.practiceRemainingOnly || this.practiceFlaggedOnly) return;
     let testName = `${this.repositoryName} - ${new Date().toLocaleDateString()}`;
 
     if (this.parentTestId && this.retestType) {
@@ -1130,6 +1228,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
   openMoveQuestionDialog(): void {
+    if (!this.repoManagement) return;
     this.showMoveQuestionDialog = true;
     this.loadAvailableRepositories();
   }
@@ -1202,6 +1301,10 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleQuestionSelection(index: number, event?: MouseEvent): void {
+    // Right-click bulk-select is part of the move workflow; when repo management
+    // is off, let the browser's native context menu through instead.
+    if (!this.repoManagement) return;
+
     if (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -1300,6 +1403,7 @@ export class TestComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDeleteQuestionDialog(): void {
+    if (!this.repoManagement) return;
     this.showDeleteQuestionDialog = true;
   }
 

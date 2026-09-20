@@ -16,6 +16,9 @@ export class RepositoryTreeNodeComponent {
   @Input() summaries: { [key: string]: RepositorySummary } = {};
   @Input() visiblePaths: Set<string> | null = null;
   @Input() searchQuery = '';
+  // When true, only the repository name and question count are shown - every
+  // progress column is dropped for a compact, mobile-friendly row.
+  @Input() condensed = false;
 
   @Output() toggleExpand = new EventEmitter<string>();
   @Output() navigate = new EventEmitter<RepositoryNode>();

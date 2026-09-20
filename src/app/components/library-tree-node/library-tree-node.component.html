@@ -1,0 +1,20 @@
+<div class="lib-row" [style.padding-left.rem]="depth * 1.25">
+  <button type="button" class="chevron" [class.expanded]="isExpanded"
+    [class.hidden]="!node.hasChildren" (click)="onChevron()" aria-label="Expand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M9 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+
+  <label class="lib-check">
+    <input type="checkbox" [checked]="checked" [indeterminate]="indeterminate" (change)="onCheck($event)">
+    <span class="lib-name">{{ node.name }}</span>
+  </label>
+</div>
+
+<div class="lib-children" *ngIf="node.hasChildren && isExpanded">
+  <app-library-tree-node *ngFor="let child of node.children" [node]="child" [depth]="depth + 1"
+    [checkedIds]="checkedIds" [descendantsById]="descendantsById" [expandedIds]="expandedIds"
+    (toggle)="toggle.emit($event)" (toggleExpand)="toggleExpand.emit($event)">
+  </app-library-tree-node>
+</div>

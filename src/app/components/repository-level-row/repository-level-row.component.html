@@ -1,0 +1,48 @@
+<div class="level-row" [class.condensed]="condensed" [class.clickable]="isRowClickable"
+  [class.is-folder]="node.hasChildren" (click)="onRowClick()"
+  [title]="node.hasChildren ? 'Open ' + node.name + ' — totals include all nested repositories' : ''">
+
+  <div class="row-head">
+    <span class="repo-name">{{ node.name }}</span>
+
+    <span *ngIf="summary" class="q-count" [class.q-count-clickable]="canPractice"
+      [title]="canPractice ? 'Start a test on all ' + total + ' questions' : ''"
+      (click)="onCountClick($event)">{{ total }}</span>
+
+    <svg *ngIf="node.hasChildren" class="disclosure" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      aria-hidden="true">
+      <path d="M9 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </div>
+
+  <div class="row-progress" *ngIf="!condensed && summary && (summary.attempted > 0 || summary.flagged > 0)">
+    <ng-container *ngIf="summary as s">
+    <div class="stacked-bar" *ngIf="s.attempted > 0" [title]="s.attempted + ' of ' + s.totalQuestions + ' attempted'">
+      <span class="seg seg-correct" *ngIf="s.correct > 0" [style.width.%]="pct(s.correct)"
+        (click)="onReviewCorrect($event)" title="Review correct answers"></span>
+      <span class="seg seg-incorrect" *ngIf="s.incorrect > 0" [style.width.%]="pct(s.incorrect)"
+        (click)="onReviewIncorrect($event)" title="Practise incorrect answers"></span>
+      <span class="seg seg-skipped" *ngIf="skipped > 0" [style.width.%]="pct(skipped)" title="Skipped"></span>
+    </div>
+
+    <div class="legend">
+      <a class="chip chip-attempted" *ngIf="s.attempted > 0" (click)="onReviewAttempted($event)">
+        {{ s.attempted }} / {{ s.totalQuestions }} attempted
+      </a>
+      <a class="chip chip-correct" *ngIf="s.correct > 0" (click)="onReviewCorrect($event)">
+        <span class="dot"></span>{{ s.correct }} correct
+      </a>
+      <a class="chip chip-incorrect" *ngIf="s.incorrect > 0" (click)="onReviewIncorrect($event)">
+        <span class="dot"></span>{{ s.incorrect }} incorrect
+      </a>
+      <a class="chip chip-remaining" *ngIf="remaining > 0" (click)="onReviewRemaining($event)">
+        <span class="dot"></span>{{ remaining }} left
+      </a>
+      <a class="chip chip-flagged" *ngIf="s.flagged > 0" (click)="onReviewFlagged($event)">
+        🚩 {{ s.flagged }} flagged
+      </a>
+      <span class="chip chip-score" *ngIf="s.attempted > 0">{{ s.score }}%</span>
+    </div>
+    </ng-container>
+  </div>
+</div>

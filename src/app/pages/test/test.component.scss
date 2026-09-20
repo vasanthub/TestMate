@@ -133,6 +133,11 @@
     border-color: #f59e0b;
     color: white;
   }
+
+  &.btn-flag.active {
+    background-color: #fef3c7;
+    border-color: #f59e0b;
+  }
 }
 
 .progress-bar {
@@ -561,6 +566,7 @@
 }
 
 .question-box {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -585,6 +591,19 @@
     font-size: 0.65rem;
     font-weight: 400;
     opacity: 0.85;
+  }
+
+  .flag-marker {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.3rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  }
+
+  &.flagged {
+    box-shadow: 0 0 0 2px #f59e0b;
   }
 
   &:hover {
